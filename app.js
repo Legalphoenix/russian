@@ -76,6 +76,27 @@ const formMeta = {
 const pastForms = ["был", "была", "было", "были"];
 const futureForms = ["буду", "будешь", "будет", "будем", "будете", "будут"];
 const allForms = [...pastForms, ...futureForms];
+const phaseOrder = ["warmup", "sentences", "mastery"];
+const phaseMeta = {
+  warmup: {
+    title: "Step 1: Pattern warm-up",
+    pill: "Warm-up",
+    badge: "Warm-up",
+    summary: "Manual: Warm-up",
+  },
+  sentences: {
+    title: "Step 2: Sentence lab",
+    pill: "Sentence lab",
+    badge: "Sentence lab",
+    summary: "Manual: Sentence lab",
+  },
+  mastery: {
+    title: "Step 3: Mixed mastery loop",
+    pill: "Mastery",
+    badge: "Mixed review",
+    summary: "Manual: Mixed mastery",
+  },
+};
 
 const warmupItems = [
   {
@@ -513,7 +534,6 @@ const el = {
   phasePill: document.querySelector("#phasePill"),
   phaseProgress: document.querySelector("#phaseProgress"),
   modeBadge: document.querySelector("#modeBadge"),
-  focusLine: document.querySelector("#focusLine"),
   promptLabel: document.querySelector("#promptLabel"),
   promptText: document.querySelector("#promptText"),
   subPrompt: document.querySelector("#subPrompt"),
@@ -526,16 +546,22 @@ const el = {
   masteryGrid: document.querySelector("#masteryGrid"),
   weakSpotList: document.querySelector("#weakSpotList"),
   audioButton: document.querySelector("#audioButton"),
+  phaseOverrideSelect: document.querySelector("#phaseOverrideSelect"),
+  settingsSummary: document.querySelector("#settingsSummary"),
+  memoryNote: document.querySelector("#memoryNote"),
 };
 
 const defaultState = {
   speakerGender: "masculine",
   currentPhase: "warmup",
+  phaseOverride: "auto",
   turn: 0,
   currentItemId: null,
+  currentOptionOrder: [],
   currentSolved: false,
   currentChoice: null,
   hintVisible: false,
+  savedAt: null,
   totalAnswered: 0,
   totalCorrect: 0,
   streak: 0,
@@ -562,6 +588,12 @@ function loadState() {
 function mergeState(candidate) {
   const merged = structuredClone(defaultState);
   Object.assign(merged, candidate);
+  merged.currentPhase = phaseOrder.includes(candidate.currentPhase) ? candidate.currentPhase : "warmup";
+  merged.phaseOverride = candidate.phaseOverride === "auto" || phaseOrder.includes(candidate.phaseOverride) ? candidate.phaseOverride : "auto";
+  merged.currentOptionOrder = Array.isArray(candidate.currentOptionOrder)
+    ? candidate.currentOptionOrder.filter((option) => allForms.includes(option))
+    : [];
+  merged.savedAt = typeof candidate.savedAt === "number" ? candidate.savedAt : null;
   merged.itemStats = { ...defaultState.itemStats, ...(candidate.itemStats || {}) };
   merged.formStats = allForms.reduce((acc, form) => {
     acc[form] = {
@@ -574,6 +606,7 @@ function mergeState(candidate) {
 }
 
 function saveState() {
+  state.savedAt = Date.now();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
@@ -635,19 +668,42 @@ function renderFormChips() {
   el.futureChipRow.innerHTML = futureMarkup;
 }
 
-function getCurrentPool() {
-  if (state.currentPhase === "warmup") return warmupItems;
-  if (state.currentPhase === "sentences") return sentenceItems;
+function getPoolForPhase(phase) {
+  if (phase === "warmup") return warmupItems;
+  if (phase === "sentences") return sentenceItems;
   return [...warmupItems, ...sentenceItems];
 }
 
+function getActivePhase() {
+  return state.phaseOverride === "auto" ? state.currentPhase : state.phaseOverride;
+}
+
+function getCurrentPool() {
+  return getPoolForPhase(getActivePhase());
+}
+
+function getOptionSetForItem(item) {
+  return getActivePhase() === "mastery" ? allForms : item.options;
+}
+
+function isValidOptionOrder(item) {
+  const optionSet = getOptionSetForItem(item);
+  return (
+    Array.isArray(state.currentOptionOrder) &&
+    state.currentOptionOrder.length === optionSet.length &&
+    optionSet.every((option) => state.currentOptionOrder.includes(option))
+  );
+}
+
 function phaseProgressText() {
-  if (state.currentPhase === "warmup") {
+  const activePhase = getActivePhase();
+
+  if (activePhase === "warmup") {
     const mastered = warmupItems.filter((item) => (state.itemStats[item.id]?.correct || 0) > 0).length;
     return `${mastered} / ${warmupItems.length} mastered`;
   }
 
-  if (state.currentPhase === "sentences") {
+  if (activePhase === "sentences") {
     const seen = sentenceItems.filter((item) => (state.itemStats[item.id]?.seen || 0) > 0).length;
     return `${seen} / ${sentenceItems.length} seen`;
   }
@@ -695,9 +751,17 @@ function currentItem() {
   return itemsById[state.currentItemId];
 }
 
+function itemMatchesActivePhase(item) {
+  const activePhase = getActivePhase();
+  if (activePhase === "mastery") return true;
+  return item.phase === activePhase;
+}
+
 function startNextCard() {
   updatePhaseIfNeeded();
   state.currentItemId = pickNextItemId();
+  const item = currentItem();
+  state.currentOptionOrder = item ? shuffle([...getOptionSetForItem(item)]) : [];
   state.currentSolved = false;
   state.currentChoice = null;
   state.hintVisible = false;
@@ -706,17 +770,9 @@ function startNextCard() {
 }
 
 function renderPhaseMeta() {
-  if (state.currentPhase === "warmup") {
-    el.phaseTitle.textContent = "Step 1: Pattern warm-up";
-    el.phasePill.textContent = "Warm-up";
-  } else if (state.currentPhase === "sentences") {
-    el.phaseTitle.textContent = "Step 2: Sentence lab";
-    el.phasePill.textContent = "Sentence lab";
-  } else {
-    el.phaseTitle.textContent = "Step 3: Mixed mastery loop";
-    el.phasePill.textContent = "Mastery";
-  }
-
+  const meta = phaseMeta[getActivePhase()];
+  el.phaseTitle.textContent = meta.title;
+  el.phasePill.textContent = meta.pill;
   el.phaseProgress.textContent = phaseProgressText();
 }
 
@@ -740,26 +796,15 @@ function renderPrompt() {
   const item = currentItem();
   if (!item) return;
 
-  el.modeBadge.textContent = item.mode;
-  el.focusLine.textContent = item.focus;
-  el.promptLabel.textContent = state.currentPhase === "warmup" ? "Russian cue" : "Russian sentence";
+  el.modeBadge.textContent = phaseMeta[getActivePhase()].badge;
+  el.promptLabel.textContent = getActivePhase() === "warmup" ? "Russian cue" : "Russian sentence";
   el.promptText.innerHTML = formatPrompt(item.prompt);
   el.subPrompt.textContent = item.subPrompt || "";
   el.choiceNudge.textContent = state.currentSolved
     ? "Good. Review the explanation, then tap Next card."
     : "Tap the correct form below.";
+  el.hintButton.textContent = state.hintVisible ? "Hide hint" : "Reveal hint";
   el.hintText.textContent = state.hintVisible ? item.hint : "";
-
-  if (!state.currentSolved) {
-    el.feedbackCard.classList.add("is-hidden");
-    el.feedbackCard.classList.remove("is-correct", "is-wrong");
-    el.feedbackCard.innerHTML = `
-      <p class="feedback-title">Pick an answer to see the logic.</p>
-      <p class="feedback-body">The explanation will tell you exactly what cue to notice next time.</p>
-    `;
-  } else {
-    el.feedbackCard.classList.remove("is-hidden");
-  }
 }
 
 function renderOptions() {
@@ -767,7 +812,7 @@ function renderOptions() {
   if (!item) return;
 
   const answer = getConfiguredAnswer(item);
-  const options = state.currentPhase === "mastery" ? shuffle([...allForms]) : shuffle([...item.options]);
+  const options = isValidOptionOrder(item) ? state.currentOptionOrder : [...getOptionSetForItem(item)];
   el.optionsGrid.innerHTML = options
     .map((option) => {
       const selected = state.currentChoice === option;
@@ -789,6 +834,38 @@ function renderOptions() {
       `;
     })
     .join("");
+}
+
+function renderFeedback() {
+  const item = currentItem();
+  if (!item) return;
+
+  if (!state.currentSolved) {
+    el.feedbackCard.classList.add("is-hidden");
+    el.feedbackCard.classList.remove("is-correct", "is-wrong");
+    el.feedbackCard.innerHTML = `
+      <p class="feedback-title">Pick an answer to see the logic.</p>
+      <p class="feedback-body">The explanation will tell you exactly what cue to notice next time.</p>
+    `;
+    return;
+  }
+
+  const answer = getConfiguredAnswer(item);
+  const correct = state.currentChoice === answer;
+  const alternate =
+    item.id === "sentence-19"
+      ? state.speakerGender === "feminine"
+        ? "Masculine speakers would say я был."
+        : "Feminine speakers would say я была."
+      : "";
+
+  el.feedbackCard.classList.remove("is-hidden");
+  el.feedbackCard.classList.toggle("is-correct", correct);
+  el.feedbackCard.classList.toggle("is-wrong", !correct);
+  el.feedbackCard.innerHTML = `
+    <p class="feedback-title">${correct ? "Correct." : `Use ${answer}.`}</p>
+    <p class="feedback-body">${item.explanation}${alternate ? ` ${alternate}` : ""}</p>
+  `;
 }
 
 function renderMastery() {
@@ -829,12 +906,23 @@ function renderButtons() {
   el.nextButton.parentElement.classList.toggle("is-hidden", !state.currentSolved);
 }
 
+function renderSettings() {
+  el.phaseOverrideSelect.value = state.phaseOverride;
+  el.settingsSummary.textContent = state.phaseOverride === "auto" ? "Automatic step" : phaseMeta[state.phaseOverride].summary;
+  el.memoryNote.textContent =
+    state.phaseOverride === "auto"
+      ? "Progress, current card, and settings resume automatically on this device."
+      : "Manual step is active. Switch back to Automatic whenever you want the trainer to choose the next step for you.";
+}
+
 function render() {
   renderPhaseMeta();
   renderHeaderMetrics();
   renderGenderControl();
+  renderSettings();
   renderPrompt();
   renderOptions();
+  renderFeedback();
   renderMastery();
   renderWeakSpots();
   renderButtons();
@@ -860,7 +948,6 @@ function submitAnswer(choice) {
   state.totalAnswered += 1;
   state.currentChoice = choice;
   state.currentSolved = true;
-  state.hintVisible = true;
 
   if (correct) {
     stats.correct += 1;
@@ -876,21 +963,6 @@ function submitAnswer(choice) {
     state.streak = 0;
     state.formStats[answer].wrong += 1;
   }
-
-  const alternate =
-    item.id === "sentence-19"
-      ? state.speakerGender === "feminine"
-        ? "Masculine speakers would say я был."
-        : "Feminine speakers would say я была."
-      : "";
-
-  el.feedbackCard.classList.toggle("is-correct", correct);
-  el.feedbackCard.classList.toggle("is-wrong", !correct);
-  el.feedbackCard.classList.remove("is-hidden");
-  el.feedbackCard.innerHTML = `
-    <p class="feedback-title">${correct ? "Correct." : `Use ${answer}.`}</p>
-    <p class="feedback-body">${item.explanation}${alternate ? ` ${alternate}` : ""}</p>
-  `;
 
   state.turn += 1;
   saveState();
@@ -954,9 +1026,21 @@ el.speakerGenderControl.addEventListener("click", (event) => {
   render();
 });
 
+el.phaseOverrideSelect.addEventListener("change", (event) => {
+  state.phaseOverride = event.target.value;
+  saveState();
+  startNextCard();
+});
+
 el.resetSessionButton.addEventListener("click", () => {
   resetSession();
 });
 
 renderFormChips();
-startNextCard();
+
+updatePhaseIfNeeded();
+if (!currentItem() || !itemMatchesActivePhase(currentItem()) || !isValidOptionOrder(currentItem())) {
+  startNextCard();
+} else {
+  render();
+}

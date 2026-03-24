@@ -126,8 +126,7 @@
           <article class="prompt-card">
             <div class="prompt-toolbar">
               <div class="meta-stack">
-                <span class="mode-badge" id="modeBadge">Pattern cue</span>
-                <span class="focus-line" id="focusLine">Start by spotting the tense.</span>
+                <span class="mode-badge" id="modeBadge">Warm-up</span>
               </div>
               <button id="audioButton" class="icon-button" type="button">Listen</button>
             </div>
@@ -206,6 +205,30 @@
             <p class="anchor-tip">When you see a masculine singular subject, past tense points straight to <span class="inline-ru">был</span>.</p>
           </article>
         </div>
+      </section>
+
+      <section class="panel settings-panel">
+        <details class="settings-details">
+          <summary class="settings-summary-row">
+            <div>
+              <p class="section-kicker">Trainer settings</p>
+              <h2>Saved on this device</h2>
+            </div>
+            <span class="settings-summary" id="settingsSummary">Automatic step</span>
+          </summary>
+
+          <div class="settings-body">
+            <p class="settings-note" id="memoryNote">Progress, current card, and settings resume automatically on this device.</p>
+
+            <label class="settings-label" for="phaseOverrideSelect">Jump to step</label>
+            <select id="phaseOverrideSelect" class="settings-select">
+              <option value="auto">Automatic</option>
+              <option value="warmup">Step 1: Warm-up</option>
+              <option value="sentences">Step 2: Sentence lab</option>
+              <option value="mastery">Step 3: Mixed mastery</option>
+            </select>
+          </div>
+        </details>
       </section>
     </main>
 

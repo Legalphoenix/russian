@@ -355,8 +355,7 @@ select {
   color: var(--accent-deep);
 }
 
-.phase-progress,
-.focus-line {
+.phase-progress {
   color: var(--muted);
 }
 
@@ -592,6 +591,71 @@ select {
   line-height: 1.35;
 }
 
+.settings-panel {
+  overflow: hidden;
+  padding: 0;
+}
+
+.settings-details {
+  background: transparent;
+}
+
+.settings-summary-row {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 18px 22px;
+  cursor: pointer;
+}
+
+.settings-summary-row::-webkit-details-marker {
+  display: none;
+}
+
+.settings-summary-row h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.settings-summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(31, 26, 23, 0.05);
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.settings-body {
+  display: grid;
+  gap: 0.8rem;
+  padding: 0 22px 22px;
+}
+
+.settings-note {
+  margin: 0;
+  color: var(--muted);
+}
+
+.settings-label {
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.settings-select {
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid rgba(49, 37, 28, 0.12);
+  background: rgba(255, 251, 244, 0.94);
+  color: var(--ink);
+  padding: 0.75rem 0.9rem;
+}
+
 @media (min-width: 720px) {
   body {
     padding-left: 24px;
@@ -628,6 +692,20 @@ select {
   .practice-options-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+
+  .settings-body {
+    grid-template-columns: minmax(0, 1.5fr) minmax(220px, 0.8fr);
+    align-items: end;
+  }
+
+  .settings-label {
+    grid-column: 2;
+  }
+
+  .settings-select {
+    grid-column: 2;
+    grid-row: 2;
+  }
 }
 
 @media (max-width: 719px) {
@@ -663,6 +741,11 @@ select {
   .sub-prompt,
   .choice-nudge {
     margin-top: 0.35rem;
+  }
+
+  .settings-summary-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
