@@ -517,6 +517,7 @@ const el = {
   promptLabel: document.querySelector("#promptLabel"),
   promptText: document.querySelector("#promptText"),
   subPrompt: document.querySelector("#subPrompt"),
+  choiceNudge: document.querySelector("#choiceNudge"),
   hintButton: document.querySelector("#hintButton"),
   hintText: document.querySelector("#hintText"),
   feedbackCard: document.querySelector("#feedbackCard"),
@@ -744,6 +745,9 @@ function renderPrompt() {
   el.promptLabel.textContent = state.currentPhase === "warmup" ? "Russian cue" : "Russian sentence";
   el.promptText.innerHTML = formatPrompt(item.prompt);
   el.subPrompt.textContent = item.subPrompt || "";
+  el.choiceNudge.textContent = state.currentSolved
+    ? "Good. Review the explanation, then tap Next card."
+    : "Tap the correct form below.";
   el.hintText.textContent = state.hintVisible ? item.hint : "";
 
   if (!state.currentSolved) {

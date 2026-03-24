@@ -190,12 +190,24 @@ select {
 
 .microcopy,
 .sub-prompt,
+.choice-nudge,
+.sidebar-helper,
 .hint-text,
 .anchor-tip,
 .feedback-body,
 .rule-card p,
 .coach-card p {
   color: var(--muted);
+}
+
+.choice-nudge,
+.sidebar-helper {
+  margin: 0.5rem 0 0;
+  font-size: 0.95rem;
+}
+
+.choice-nudge {
+  font-weight: 600;
 }
 
 .segmented {

@@ -136,6 +136,7 @@
               <p class="prompt-label" id="promptLabel">Russian prompt</p>
               <div id="promptText" class="prompt-text"></div>
               <p id="subPrompt" class="sub-prompt"></p>
+              <p id="choiceNudge" class="choice-nudge">Tap the correct form below.</p>
             </div>
 
             <div class="hint-row">
@@ -155,6 +156,12 @@
 
           <aside class="sidebar-stack">
             <article class="sidebar-card">
+              <p class="sidebar-kicker">Tap your answer</p>
+              <p class="sidebar-helper">Choose the one form that correctly fills the blank.</p>
+              <div id="optionsGrid" class="options-grid" aria-label="Answer choices"></div>
+            </article>
+
+            <article class="sidebar-card">
               <p class="sidebar-kicker">Mastery by form</p>
               <div class="mastery-grid" id="masteryGrid"></div>
             </article>
@@ -162,11 +169,6 @@
             <article class="sidebar-card">
               <p class="sidebar-kicker">Most fragile right now</p>
               <div id="weakSpotList" class="weak-spot-list"></div>
-            </article>
-
-            <article class="sidebar-card">
-              <p class="sidebar-kicker">Answer bank</p>
-              <div id="optionsGrid" class="options-grid" aria-label="Answer choices"></div>
             </article>
           </aside>
         </div>
