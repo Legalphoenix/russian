@@ -305,13 +305,26 @@ select {
 }
 
 .panel-heading,
-.prompt-toolbar,
 .action-row,
 .hint-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.prompt-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 1rem;
+}
+
+.meta-stack {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
 }
 
 .phase-status {
@@ -364,7 +377,7 @@ select {
 
 .prompt-card {
   display: grid;
-  gap: 1.2rem;
+  gap: 1rem;
 }
 
 .prompt-label {
@@ -401,6 +414,11 @@ select {
   border: 1px solid rgba(49, 37, 28, 0.08);
 }
 
+.feedback-card.is-hidden,
+.action-row.is-hidden {
+  display: none;
+}
+
 .feedback-card.is-correct {
   background: rgba(26, 111, 105, 0.09);
   border-color: rgba(26, 111, 105, 0.14);
@@ -431,6 +449,11 @@ select {
 .options-grid {
   display: grid;
   gap: 10px;
+}
+
+.practice-options {
+  display: grid;
+  gap: 0.55rem;
 }
 
 .mastery-grid {
@@ -601,11 +624,14 @@ select {
   .mastery-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+
+  .practice-options-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 719px) {
   .panel-heading,
-  .prompt-toolbar,
   .hint-row,
   .action-row {
     flex-direction: column;
@@ -622,6 +648,21 @@ select {
 
   .options-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .prompt-card,
+  .sidebar-card,
+  .anchor-card {
+    padding: 16px;
+  }
+
+  .prompt-text {
+    font-size: clamp(1.55rem, 9vw, 2.1rem);
+  }
+
+  .sub-prompt,
+  .choice-nudge {
+    margin-top: 0.35rem;
   }
 }
 

@@ -751,11 +751,14 @@ function renderPrompt() {
   el.hintText.textContent = state.hintVisible ? item.hint : "";
 
   if (!state.currentSolved) {
+    el.feedbackCard.classList.add("is-hidden");
     el.feedbackCard.classList.remove("is-correct", "is-wrong");
     el.feedbackCard.innerHTML = `
       <p class="feedback-title">Pick an answer to see the logic.</p>
       <p class="feedback-body">The explanation will tell you exactly what cue to notice next time.</p>
     `;
+  } else {
+    el.feedbackCard.classList.remove("is-hidden");
   }
 }
 
@@ -823,6 +826,7 @@ function renderWeakSpots() {
 
 function renderButtons() {
   el.nextButton.disabled = !state.currentSolved;
+  el.nextButton.parentElement.classList.toggle("is-hidden", !state.currentSolved);
 }
 
 function render() {
@@ -882,6 +886,7 @@ function submitAnswer(choice) {
 
   el.feedbackCard.classList.toggle("is-correct", correct);
   el.feedbackCard.classList.toggle("is-wrong", !correct);
+  el.feedbackCard.classList.remove("is-hidden");
   el.feedbackCard.innerHTML = `
     <p class="feedback-title">${correct ? "Correct." : `Use ${answer}.`}</p>
     <p class="feedback-body">${item.explanation}${alternate ? ` ${alternate}` : ""}</p>
