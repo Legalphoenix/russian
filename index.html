@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="A focused Russian drill page for mastering был, была, было, были, буду, будешь, будет, будем, будете, будут."
+    />
+    <title>Russian Form Trainer</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;700&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true">
+      <div class="orb orb-a"></div>
+      <div class="orb orb-b"></div>
+      <div class="grid-wash"></div>
+    </div>
+
+    <main class="app-shell">
+      <header class="hero panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Russian Forms Intensive</p>
+          <h1>Master <span>был / была / было / были / буду / будешь / будет / будем / будете / будут</span></h1>
+          <p class="lede">
+            This page trains the exact decision that matters each time: first the time clue, then the subject.
+            Wrong answers come back quickly until the pattern sticks.
+          </p>
+        </div>
+
+        <div class="hero-controls">
+          <div class="control-card">
+            <p class="control-label">Past tense for “я”</p>
+            <div class="segmented" id="speakerGenderControl" role="radiogroup" aria-label="Speaker gender in the past tense">
+              <button class="segment is-active" type="button" data-gender="masculine" aria-pressed="true">Masculine</button>
+              <button class="segment" type="button" data-gender="feminine" aria-pressed="false">Feminine</button>
+            </div>
+            <p class="microcopy">Used for cards like <span class="inline-ru">Вчера я ___ дома.</span></p>
+          </div>
+
+          <div class="control-card metrics-card">
+            <div class="metric-row">
+              <span>Cards solved</span>
+              <strong id="cardsSolved">0</strong>
+            </div>
+            <div class="metric-row">
+              <span>Current streak</span>
+              <strong id="currentStreak">0</strong>
+            </div>
+            <div class="metric-row">
+              <span>Accuracy</span>
+              <strong id="accuracyValue">0%</strong>
+            </div>
+            <button id="resetSessionButton" class="ghost-button" type="button">Reset session</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="learn-grid">
+        <article class="rule-card panel">
+          <p class="section-kicker">Step 1</p>
+          <h2>Past lane: yesterday decides the family</h2>
+          <p>
+            If the sentence is in the past, the form agrees with the subject’s gender or number.
+          </p>
+          <div class="chip-row" id="pastChipRow"></div>
+          <ul class="rule-list">
+            <li><span class="inline-ru">был</span> for masculine singular: <span class="inline-ru">он, брат, учитель</span></li>
+            <li><span class="inline-ru">была</span> for feminine singular: <span class="inline-ru">она, мама, сестра</span></li>
+            <li><span class="inline-ru">было</span> for neuter singular: <span class="inline-ru">письмо</span></li>
+            <li><span class="inline-ru">были</span> for plural: <span class="inline-ru">они, дети, друзья, мы</span></li>
+          </ul>
+        </article>
+
+        <article class="rule-card panel">
+          <p class="section-kicker">Step 2</p>
+          <h2>Future lane: tomorrow decides the person</h2>
+          <p>
+            If the sentence points forward, choose the future form from the subject: <span class="inline-ru">я / ты / он-она / мы / вы / они</span>.
+          </p>
+          <div class="chip-row" id="futureChipRow"></div>
+          <ul class="rule-list">
+            <li><span class="inline-ru">буду / будешь / будет / будем / будете / будут</span> track person and number</li>
+            <li>With an infinitive after it, keep the same future form: <span class="inline-ru">будут играть</span>, <span class="inline-ru">будете смотреть</span></li>
+            <li><span class="inline-ru">вы</span> takes <span class="inline-ru">будете</span> whether plural or polite singular</li>
+          </ul>
+        </article>
+
+        <aside class="coach-card panel">
+          <p class="section-kicker">The learning loop</p>
+          <h2>Designed for fast lock-in</h2>
+          <ol class="loop-list">
+            <li>Notice the signal first: past or future.</li>
+            <li>Choose from tight contrasts before you see mixed drills.</li>
+            <li>Get immediate feedback with the reason, not just the answer.</li>
+            <li>See your weak forms again after a short delay.</li>
+            <li>Finish with mixed retrieval so the pattern holds without hints.</li>
+          </ol>
+          <div class="note-banner">
+            <strong>Important:</strong> <span class="inline-ru">я</span> in the past depends on the speaker’s gender:
+            <span class="inline-ru">я был</span> or <span class="inline-ru">я была</span>.
+          </div>
+        </aside>
+      </section>
+
+      <section class="panel practice-panel" id="practice">
+        <div class="panel-heading">
+          <div>
+            <p class="section-kicker">Interactive drill</p>
+            <h2 id="phaseTitle">Step 1: Pattern warm-up</h2>
+          </div>
+          <div class="phase-status">
+            <span class="status-pill" id="phasePill">Warm-up</span>
+            <span class="phase-progress" id="phaseProgress">0 / 10 mastered</span>
+          </div>
+        </div>
+
+        <div class="practice-grid">
+          <article class="prompt-card">
+            <div class="prompt-toolbar">
+              <div class="meta-stack">
+                <span class="mode-badge" id="modeBadge">Pattern cue</span>
+                <span class="focus-line" id="focusLine">Start by spotting the tense.</span>
+              </div>
+              <button id="audioButton" class="icon-button" type="button">Listen</button>
+            </div>
+
+            <div class="prompt-body">
+              <p class="prompt-label" id="promptLabel">Russian prompt</p>
+              <div id="promptText" class="prompt-text"></div>
+              <p id="subPrompt" class="sub-prompt"></p>
+            </div>
+
+            <div class="hint-row">
+              <button id="hintButton" class="ghost-button" type="button">Reveal hint</button>
+              <span id="hintText" class="hint-text" aria-live="polite"></span>
+            </div>
+
+            <div class="feedback-card" id="feedbackCard" aria-live="polite">
+              <p class="feedback-title">Pick an answer to see the logic.</p>
+              <p class="feedback-body">The explanation will tell you exactly what cue to notice next time.</p>
+            </div>
+
+            <div class="action-row">
+              <button id="nextButton" class="primary-button" type="button" disabled>Next card</button>
+            </div>
+          </article>
+
+          <aside class="sidebar-stack">
+            <article class="sidebar-card">
+              <p class="sidebar-kicker">Mastery by form</p>
+              <div class="mastery-grid" id="masteryGrid"></div>
+            </article>
+
+            <article class="sidebar-card">
+              <p class="sidebar-kicker">Most fragile right now</p>
+              <div id="weakSpotList" class="weak-spot-list"></div>
+            </article>
+
+            <article class="sidebar-card">
+              <p class="sidebar-kicker">Answer bank</p>
+              <div id="optionsGrid" class="options-grid" aria-label="Answer choices"></div>
+            </article>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel anchor-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-kicker">Lock it in</p>
+            <h2>Personal memory anchors</h2>
+          </div>
+        </div>
+
+        <div class="anchor-grid">
+          <article class="anchor-card">
+            <p class="anchor-label">Your routine</p>
+            <p class="anchor-quote inline-ru">В понедельник, в среду и в пятницу я учу русский вечером с лучшей учительницей.</p>
+            <p class="anchor-tip">Turn your real schedule into future speech when you review: <span class="inline-ru">Завтра вечером я буду учить русский...</span></p>
+          </article>
+
+          <article class="anchor-card">
+            <p class="anchor-label">Future pattern</p>
+            <p class="anchor-quote inline-ru">Сегодня вечером моя сестра будет учиться.</p>
+            <p class="anchor-tip">Same decision every time: future cue first, then <span class="inline-ru">она</span> gives <span class="inline-ru">будет</span>.</p>
+          </article>
+
+          <article class="anchor-card">
+            <p class="anchor-label">Past plural</p>
+            <p class="anchor-quote inline-ru">Вчера мои друзья были в городе.</p>
+            <p class="anchor-tip">Plural subjects collapse to one clean form: <span class="inline-ru">были</span>.</p>
+          </article>
+
+          <article class="anchor-card">
+            <p class="anchor-label">Past masculine</p>
+            <p class="anchor-quote inline-ru">Вчера утром мой брат был на работе.</p>
+            <p class="anchor-tip">When you see a masculine singular subject, past tense points straight to <span class="inline-ru">был</span>.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
