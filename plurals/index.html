@@ -30,8 +30,8 @@
           <p class="eyebrow">Russian Plurals Sprint</p>
           <h1>Master <span>множественное число</span></h1>
           <p class="lede">
-            This trainer makes plural forms automatic. It tracks not just whether you were right, but how
-            quickly you got there.
+            This trainer makes plural forms automatic with sentence cues, same-word contrasts, and speed
+            tracking.
           </p>
 
           <div class="hero-links">
@@ -87,7 +87,13 @@
             </div>
 
             <div class="prompt-body">
-              <p class="prompt-label">Singular noun</p>
+              <p class="prompt-label">Sentence cue</p>
+              <p class="sentence-text" id="sentenceText">На улице стоят новые ____.</p>
+              <p class="sentence-note">Say the plural, then tap the form that fits.</p>
+            </div>
+
+            <div class="prompt-body prompt-base">
+              <p class="prompt-label">Base noun</p>
               <div class="prompt-word" id="promptWord">студент</div>
               <p class="prompt-gloss" id="promptGloss">student</p>
               <p class="prompt-direction" id="promptDirection">Choose the correct plural form below.</p>
@@ -99,7 +105,7 @@
             </div>
 
             <div class="practice-options">
-              <p class="sidebar-kicker">Choose The Plural</p>
+              <p class="sidebar-kicker">Choose The Form</p>
               <div id="optionsGrid" class="options-grid" aria-label="Plural choices"></div>
             </div>
 

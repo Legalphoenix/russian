@@ -1,40 +1,41 @@
-const STORAGE_KEY = "russian-plural-trainer-state-v1";
+const STORAGE_KEY = "russian-plural-trainer-state-v2";
+const LEGACY_STORAGE_KEYS = ["russian-plural-trainer-state-v1"];
 
 const phaseOrder = ["regular", "tricky", "irregular", "mastery"];
 const speedTargets = {
-  regular: 2800,
-  tricky: 3600,
-  irregular: 4300,
+  regular: 3200,
+  tricky: 4300,
+  irregular: 5200,
 };
 
 const phaseMeta = {
   regular: {
     title: "Step 1: Regular endings",
     pill: "Regular endings",
-    badge: "Regular drill",
+    badge: "Form contrast",
     summary: "Manual: Regular endings",
   },
   tricky: {
     title: "Step 2: Stress and tricky shifts",
     pill: "Stress and shifts",
-    badge: "Tricky drill",
+    badge: "Stress contrast",
     summary: "Manual: Stress and tricky shifts",
   },
   irregular: {
     title: "Step 3: Irregular plurals",
     pill: "Irregular plurals",
-    badge: "Irregular drill",
+    badge: "Irregular contrast",
     summary: "Manual: Irregular plurals",
   },
   mastery: {
     title: "Step 4: Mixed mastery",
     pill: "Mixed mastery",
-    badge: "Mixed review",
+    badge: "Mixed contrast",
     summary: "Manual: Mixed mastery",
   },
 };
 
-const items = [
+const rawItems = [
   {
     id: "student",
     singular: "студент",
@@ -487,6 +488,176 @@ const items = [
   },
 ];
 
+const STRESS_MARK = /\u0301/g;
+
+const sentencePrompts = {
+  student: "Это хорошие ____.",
+  museum: "В городе есть известные ____.",
+  car: "На улице стоят новые ____.",
+  actress: "Это известные ____.",
+  week: "Впереди трудные ____.",
+  station: "Это большие ____.",
+  door: "Здесь старые ____.",
+  cup: "На столе стоят чистые ____.",
+  book: "На полке лежат новые ____.",
+  place: "Здесь свободные ____.",
+  building: "Это высокие ____.",
+  table: "В комнате стоят большие ____.",
+  oldman: "Здесь сидят старые ____.",
+  game: "Это интересные ____.",
+  hand: "У меня холодные ____.",
+  sister: "Это мои ____.",
+  window: "В доме большие ____.",
+  sea: "На карте есть тёплые ____.",
+  address: "У нас новые ____.",
+  shore: "У реки крутые ____.",
+  eye: "У ребёнка большие ____.",
+  city: "Это большие ____.",
+  house: "Здесь красивые ____.",
+  train: "На станции стоят новые ____.",
+  teacher: "Это хорошие ____.",
+  color: "Это яркие ____.",
+  brother: "Это мои ____.",
+  friend: "Это мои ____.",
+  son: "Это мои ____.",
+  leaf: "На дереве зелёные ____.",
+  chair: "В комнате мягкие ____.",
+  daughter: "Это мои ____.",
+  mother: "На фотографии молодые ____.",
+  time: "Это трудные ____.",
+  tree: "В парке высокие ____.",
+  name: "Это знакомые ____.",
+  knee: "После бега болят ____.",
+  shoulder: "После спорта болят ____.",
+  ear: "У зайца длинные ____.",
+  apple: "На столе лежат красные ____.",
+  bureau: "В здании новые ____.",
+  metro: "В больших городах есть ____.",
+  taxi: "На улице ждут ____.",
+  piano: "В школе стоят старые ____.",
+  radio: "В магазине продаются новые ____.",
+  whiskey: "В баре есть дорогие ____.",
+  cafe: "В центре есть уютные ____.",
+  coffee: "В меню есть разные ____.",
+  child: "Во дворе играют ____.",
+  person: "На фото улыбаются ____.",
+};
+
+const customChoicePools = {
+  table: ["сто́лы", "столы", "стола́"],
+  oldman: ["ста́рики", "старики", "старикы"],
+  game: ["игры́", "игры", "играы"],
+  hand: ["руки́", "руки", "рукаы"],
+  sister: ["сестры", "сестраы", "сестри"],
+  window: ["окна́", "окна", "окны"],
+  sea: ["мо́ря", "моря", "мореи"],
+  address: ["адреса", "адресы", "адреси"],
+  shore: ["берега", "береги", "берегы"],
+  eye: ["глаза", "глазы", "глази"],
+  city: ["города", "городы", "городи"],
+  house: ["дома", "домы", "доми"],
+  train: ["поезда", "поезды", "поезди"],
+  teacher: ["учителя", "учители", "учительы"],
+  color: ["цвета", "цветы", "цвети"],
+  brother: ["браты", "брати", "брата"],
+  friend: ["други", "другы", "друга"],
+  son: ["сыны", "сынья", "сына"],
+  leaf: ["листы", "листи", "листа"],
+  chair: ["стулы", "стули", "стула"],
+  daughter: ["дочи", "дочеры", "дочеря"],
+  mother: ["мати", "матеры", "матеря"],
+  time: ["времена", "времени", "времены"],
+  tree: ["деревы", "дереви", "дерева"],
+  name: ["имена", "имени", "имены"],
+  knee: ["колена", "колены", "коленья"],
+  shoulder: ["плеча", "плечы", "плечья"],
+  ear: ["уха", "ухы", "ухья"],
+  apple: ["яблока", "яблокы", "яблокя"],
+  child: ["ребёнки", "ребёны", "ребёнка"],
+  person: ["человеки", "человекы", "человека"],
+};
+
+const items = rawItems.map((item) => ({
+  ...item,
+  sentence: sentencePrompts[item.id] || "Это ____.",
+}));
+
+function stripStress(text) {
+  return text.normalize("NFD").replace(STRESS_MARK, "").normalize("NFC");
+}
+
+function uniqueOptions(list) {
+  return [...new Set(list.filter(Boolean))];
+}
+
+function makeStemChoice(word, replacement) {
+  return `${word}${replacement}`;
+}
+
+function replaceEnding(word, ending, replacement) {
+  if (!word.endsWith(ending)) return `${word}${replacement}`;
+  return `${word.slice(0, -ending.length)}${replacement}`;
+}
+
+function familyChoicePool(item) {
+  const word = stripStress(item.singular);
+
+  switch (item.family) {
+    case "regular_masc_consonant":
+      return [makeStemChoice(word, "ы"), makeStemChoice(word, "и"), makeStemChoice(word, "а"), word];
+    case "regular_masc_soft": {
+      const stem = word.slice(0, -1);
+      return [makeStemChoice(stem, "и"), makeStemChoice(stem, "ы"), makeStemChoice(stem, "я"), word];
+    }
+    case "regular_fem_a": {
+      const stem = word.slice(0, -1);
+      return [makeStemChoice(stem, "ы"), makeStemChoice(stem, "и"), makeStemChoice(stem, "я"), word];
+    }
+    case "regular_fem_ya": {
+      const stem = word.slice(0, -1);
+      return [makeStemChoice(stem, "и"), makeStemChoice(stem, "ы"), makeStemChoice(stem, "я"), word];
+    }
+    case "regular_fem_soft": {
+      const stem = word.slice(0, -1);
+      return [makeStemChoice(stem, "и"), makeStemChoice(stem, "ы"), makeStemChoice(stem, "я"), word];
+    }
+    case "spelling_rule": {
+      const stem = word.slice(0, -1);
+      return [makeStemChoice(stem, "и"), makeStemChoice(stem, "ы"), makeStemChoice(stem, "я"), word];
+    }
+    case "regular_neut_o": {
+      const stem = word.slice(0, -1);
+      return [makeStemChoice(stem, "а"), makeStemChoice(stem, "и"), makeStemChoice(stem, "ы"), word];
+    }
+    case "regular_neut_e": {
+      const stem = word.slice(0, -1);
+      return [makeStemChoice(stem, "я"), makeStemChoice(stem, "и"), makeStemChoice(stem, "а"), word];
+    }
+    case "masc_a_plural":
+      return [makeStemChoice(word, "а"), makeStemChoice(word, "ы"), makeStemChoice(word, "и"), word];
+    case "masc_ya_plural": {
+      const stem = word.endsWith("ь") ? word.slice(0, -1) : word;
+      return [makeStemChoice(stem, "я"), makeStemChoice(stem, "и"), makeStemChoice(stem, "а"), word];
+    }
+    case "unchanged":
+      return [word, makeStemChoice(word, "ы"), makeStemChoice(word, "и"), makeStemChoice(word, "а")];
+    default:
+      return [stripStress(item.plural), replaceEnding(word, word.slice(-1), "ы"), replaceEnding(word, word.slice(-1), "и"), word];
+  }
+}
+
+function choiceSetForItem(item) {
+  const baseChoices = customChoicePools[item.id] || familyChoicePool(item);
+  return uniqueOptions([
+    item.plural,
+    ...baseChoices,
+    stripStress(item.plural),
+    stripStress(item.singular),
+    replaceEnding(stripStress(item.singular), stripStress(item.singular).slice(-1), "а"),
+    replaceEnding(stripStress(item.singular), stripStress(item.singular).slice(-1), "я"),
+  ]).slice(0, 4);
+}
+
 const itemsById = Object.fromEntries(items.map((item) => [item.id, item]));
 
 const dashboardGroups = [
@@ -528,6 +699,7 @@ const el = {
   phaseProgress: document.querySelector("#phaseProgress"),
   modeBadge: document.querySelector("#modeBadge"),
   timerChip: document.querySelector("#timerChip"),
+  sentenceText: document.querySelector("#sentenceText"),
   promptWord: document.querySelector("#promptWord"),
   promptGloss: document.querySelector("#promptGloss"),
   promptDirection: document.querySelector("#promptDirection"),
@@ -568,9 +740,12 @@ let timerHandle = null;
 
 function loadState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return structuredClone(defaultState);
-    return mergeState(JSON.parse(raw));
+    for (const key of [STORAGE_KEY, ...LEGACY_STORAGE_KEYS]) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      return mergeState(JSON.parse(raw));
+    }
+    return structuredClone(defaultState);
   } catch {
     return structuredClone(defaultState);
   }
@@ -689,34 +864,67 @@ function phaseProgressText() {
   return `${seen} / ${phaseItems.length} seen`;
 }
 
+function sentenceWithAnswer(item, answer, className) {
+  return item.sentence.replace("____", `<span class="${className}">${answer}</span>`);
+}
+
+function renderSentence(item) {
+  return state.currentSolved
+    ? sentenceWithAnswer(item, item.plural, "sentence-fill")
+    : sentenceWithAnswer(item, "____", "sentence-blank");
+}
+
 function buildOptionOrder(item) {
-  const picked = [item.plural];
-  const used = new Set(picked);
-
-  const pools = [
-    items.filter((candidate) => candidate.id !== item.id && candidate.family === item.family),
-    items.filter((candidate) => candidate.id !== item.id && candidate.step === item.step),
-    items.filter((candidate) => candidate.id !== item.id),
-  ];
-
-  for (const pool of pools) {
-    for (const candidate of shuffle(pool)) {
-      if (used.has(candidate.plural)) continue;
-      picked.push(candidate.plural);
-      used.add(candidate.plural);
-      if (picked.length === 4) return shuffle(picked);
-    }
-  }
-
-  return shuffle(picked);
+  return shuffle(choiceSetForItem(item));
 }
 
 function isValidOptionOrder(item) {
+  const validChoices = new Set(choiceSetForItem(item));
   return (
     Array.isArray(state.currentOptionOrder) &&
     state.currentOptionOrder.length === 4 &&
-    state.currentOptionOrder.includes(item.plural)
+    state.currentOptionOrder.includes(item.plural) &&
+    state.currentOptionOrder.every((option) => validChoices.has(option))
   );
+}
+
+function expectedEndingLabel(item) {
+  const plain = stripStress(item.plural);
+  if (stripStress(item.singular) === plain && item.family === "unchanged") return "the unchanged form";
+  if (plain.endsWith("ья")) return "-ья";
+  if (plain.endsWith("ена")) return "-ена";
+  if (plain.endsWith("ы")) return "-ы";
+  if (plain.endsWith("и")) return "-и";
+  if (plain.endsWith("а")) return "-а";
+  if (plain.endsWith("я")) return "-я";
+  return "this special plural";
+}
+
+function explainWrongChoice(item, choice) {
+  const picked = stripStress(choice || "");
+  const correct = stripStress(item.plural);
+  const singular = stripStress(item.singular);
+
+  if (!choice) return item.note;
+  if (picked === singular && correct !== singular) {
+    return `${choice} leaves the noun in the singular.`;
+  }
+  if (picked === correct && choice !== item.plural) {
+    return "The letters are close, but the stress or spelling is still off.";
+  }
+  if (picked.endsWith("ы") && !correct.endsWith("ы")) {
+    return `${choice} uses -ы, but this noun needs ${expectedEndingLabel(item)}.`;
+  }
+  if (picked.endsWith("и") && !correct.endsWith("и")) {
+    return `${choice} uses -и, but this noun needs ${expectedEndingLabel(item)}.`;
+  }
+  if (picked.endsWith("а") && !correct.endsWith("а")) {
+    return `${choice} uses -а, but this noun needs ${expectedEndingLabel(item)}.`;
+  }
+  if (picked.endsWith("я") && !correct.endsWith("я")) {
+    return `${choice} uses -я, but this noun needs ${expectedEndingLabel(item)}.`;
+  }
+  return `${choice} follows a different plural pattern from ${item.plural}.`;
 }
 
 function itemMatchesActivePhase(item) {
@@ -807,11 +1015,12 @@ function renderPrompt() {
   const item = currentItem();
   if (!item) return;
 
+  el.sentenceText.innerHTML = renderSentence(item);
   el.promptWord.textContent = item.singular;
   el.promptGloss.textContent = item.gloss;
   el.promptDirection.textContent = state.currentSolved
-    ? "Review the rule and your speed, then move on."
-    : "Choose the correct plural form below.";
+    ? "Review why this ending won."
+    : "Base form for reference.";
   el.hintButton.textContent = state.currentHintVisible ? "Hide rule" : "Reveal rule";
   el.hintText.textContent = state.currentHintVisible ? item.note : "";
   renderTimerChip();
@@ -848,8 +1057,8 @@ function renderFeedback() {
     el.feedbackCard.classList.add("is-hidden");
     el.feedbackCard.classList.remove("is-correct", "is-wrong");
     el.feedbackCard.innerHTML = `
-      <p class="feedback-title">Pick an answer to see the rule and your time.</p>
-      <p class="feedback-body">Fast and correct matters more than slow recognition.</p>
+      <p class="feedback-title">Pick the form that truly fits the sentence.</p>
+      <p class="feedback-body">You are training retrieval, not just spotting the only familiar-looking word.</p>
     `;
     return;
   }
@@ -857,6 +1066,9 @@ function renderFeedback() {
   const responseMs = state.currentResponseMs || 0;
   const fastTarget = speedTargetForItem(item);
   const isCorrect = state.currentChoice === item.plural;
+  const contrastLine = isCorrect
+    ? `You beat the close distractors. ${item.note}`
+    : `You picked ${state.currentChoice}. ${explainWrongChoice(item, state.currentChoice)} ${item.note}`;
   const speedLine = isCorrect
     ? responseMs <= fastTarget
       ? `Correct in ${formatMs(responseMs)}. That was within the fast target of ${formatMs(fastTarget)}.`
@@ -868,7 +1080,8 @@ function renderFeedback() {
   el.feedbackCard.classList.toggle("is-wrong", !isCorrect);
   el.feedbackCard.innerHTML = `
     <p class="feedback-title">${isCorrect ? `Correct: ${item.plural}` : `Use ${item.plural}`}</p>
-    <p class="feedback-body">${speedLine} ${item.note}</p>
+    <p class="feedback-sentence">${sentenceWithAnswer(item, item.plural, "sentence-fill")}</p>
+    <p class="feedback-body">${speedLine} ${contrastLine}</p>
   `;
 }
 
