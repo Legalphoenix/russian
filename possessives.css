@@ -1,0 +1,311 @@
+:root {
+  --family-my: #4f8a3a;
+  --family-your-sg: #3669c9;
+  --family-his: #4c3a8e;
+  --family-her: #8d3e64;
+  --family-our: #2f3445;
+  --family-your-pl: #bb7430;
+  --family-their: #285f70;
+}
+
+body.possessives-page {
+  background:
+    radial-gradient(circle at top left, rgba(79, 138, 58, 0.14), transparent 26%),
+    radial-gradient(circle at top right, rgba(54, 105, 201, 0.12), transparent 30%),
+    linear-gradient(180deg, #fbf8f1 0%, #efe7d8 100%);
+}
+
+.possessives-page .orb-a {
+  background: rgba(79, 138, 58, 0.15);
+}
+
+.possessives-page .orb-b {
+  background: rgba(54, 105, 201, 0.12);
+}
+
+.possessive-hero .hero-copy {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.possessive-hero .hero h1,
+.possessive-hero h1 {
+  max-width: 10.5ch;
+}
+
+.possessive-learn-grid .matrix-panel {
+  grid-column: 1 / -1;
+}
+
+.speed-band-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 1rem;
+}
+
+.speed-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.56);
+  border: 1px solid rgba(49, 37, 28, 0.08);
+}
+
+.speed-band strong {
+  font-size: 0.96rem;
+}
+
+.speed-band span {
+  color: var(--muted);
+  text-align: right;
+}
+
+.reference-matrix {
+  display: grid;
+  grid-template-columns: minmax(82px, 0.8fr) repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+  margin-top: 1.4rem;
+}
+
+.matrix-head,
+.matrix-owner,
+.matrix-cell {
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(49, 37, 28, 0.08);
+}
+
+.matrix-head,
+.matrix-owner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.85rem;
+  background: rgba(31, 26, 23, 0.04);
+  text-align: center;
+  font-weight: 700;
+}
+
+.matrix-head span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+
+.matrix-owner {
+  font-size: 1.15rem;
+  color: var(--family-color, var(--ink));
+}
+
+.matrix-cell {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 0.4rem;
+  align-content: space-between;
+  min-height: 94px;
+  padding: 0.9rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.52)),
+    linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0));
+}
+
+.matrix-cell::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: calc(var(--mastery, 0) * 100%);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0), color-mix(in srgb, var(--family-color) 22%, white));
+  opacity: 0.9;
+}
+
+.matrix-cell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.matrix-word {
+  font-family: "Literata", serif;
+  font-size: 1.55rem;
+  color: var(--family-color);
+}
+
+.matrix-percent {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.matrix-cell.is-active {
+  border-color: color-mix(in srgb, var(--family-color) 58%, black);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--family-color) 24%, white);
+  transform: translateY(-1px);
+}
+
+.family-my {
+  --family-color: var(--family-my);
+}
+
+.family-your-sg {
+  --family-color: var(--family-your-sg);
+}
+
+.family-his {
+  --family-color: var(--family-his);
+}
+
+.family-her {
+  --family-color: var(--family-her);
+}
+
+.family-our {
+  --family-color: var(--family-our);
+}
+
+.family-your-pl {
+  --family-color: var(--family-your-pl);
+}
+
+.family-their {
+  --family-color: var(--family-their);
+}
+
+.translation-line {
+  margin: 0.8rem 0 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.prompt-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 1rem;
+}
+
+.prompt-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(31, 26, 23, 0.05);
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.prompt-chip strong {
+  color: var(--ink);
+  margin-right: 0.35rem;
+}
+
+.prompt-chip[class*="family-"] {
+  background: color-mix(in srgb, var(--family-color) 14%, white);
+  color: color-mix(in srgb, var(--family-color) 68%, black);
+}
+
+.prompt-chip[class*="family-"] strong {
+  color: inherit;
+}
+
+.family-mastery-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.family-card {
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.95rem;
+  border-radius: var(--radius-md);
+  background: rgba(31, 26, 23, 0.04);
+  border: 1px solid rgba(49, 37, 28, 0.08);
+  color: var(--family-color, var(--ink));
+}
+
+.family-card strong {
+  font-family: "Literata", serif;
+  font-size: 1.2rem;
+  color: var(--family-color);
+}
+
+.family-card small,
+.family-card span {
+  color: var(--muted);
+}
+
+.family-track {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(31, 26, 23, 0.08);
+  overflow: hidden;
+}
+
+.family-track-fill {
+  display: block;
+  height: 100%;
+  width: calc(var(--mastery, 0) * 100%);
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--family-color) 84%, white), var(--family-color));
+}
+
+.weak-spot-item .weak-title {
+  font-family: "Literata", serif;
+  font-size: 1.1rem;
+}
+
+.weak-spot-item .weak-line {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.possessives-page .practice-options-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (min-width: 720px) {
+  .possessive-hero {
+    grid-template-columns: 1.25fr 0.95fr;
+  }
+}
+
+@media (max-width: 900px) {
+  .reference-matrix {
+    grid-template-columns: minmax(70px, 0.9fr) repeat(4, minmax(92px, 1fr));
+  }
+
+  .matrix-word {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 719px) {
+  .speed-band {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .reference-matrix {
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .matrix-head,
+  .matrix-owner,
+  .matrix-cell {
+    min-width: 92px;
+  }
+
+  .matrix-owner {
+    min-width: 72px;
+  }
+
+  .possessives-page .practice-options-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

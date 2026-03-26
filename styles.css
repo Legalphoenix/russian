@@ -101,6 +101,36 @@ select {
   animation: rise-in 600ms ease both;
 }
 
+.page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+}
+
+.page-nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.72rem 1rem;
+  border-radius: 999px;
+  background: rgba(31, 26, 23, 0.05);
+  color: var(--muted);
+  text-decoration: none;
+  transition: transform 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.page-nav-link:hover {
+  transform: translateY(-1px);
+}
+
+.page-nav-link.is-current {
+  background: var(--ink);
+  color: #fffaf4;
+  box-shadow: 0 12px 24px rgba(31, 26, 23, 0.14);
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--line);

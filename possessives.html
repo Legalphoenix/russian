@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="A focused Russian possessive trainer for мой, моя, моё, мои, твой, твоя, твоё, твои, его, её, наш, наша, наше, наши, ваш, ваша, ваше, ваши, их."
+    />
+    <title>Russian Possessive Matrix</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;700&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./possessives.css" />
+  </head>
+  <body class="possessives-page">
+    <div class="backdrop" aria-hidden="true">
+      <div class="orb orb-a"></div>
+      <div class="orb orb-b"></div>
+      <div class="grid-wash"></div>
+    </div>
+
+    <main class="app-shell">
+      <nav class="page-nav panel" aria-label="Trainer pages">
+        <a class="page-nav-link" href="./index.html">был / буду Drill</a>
+        <a class="page-nav-link is-current" href="./possessives.html">Possessives Matrix</a>
+      </nav>
+
+      <header class="hero panel possessive-hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Russian Possessives Intensive</p>
+          <h1>Master <span>мой / твой / его / её / наш / ваш / их</span></h1>
+          <p class="lede">
+            This page trains the chart from the screenshot directly: first identify whose it is, then let the noun’s
+            gender or number choose the ending. Mastery goes up from right answers that land quickly, not from slow
+            guessing.
+          </p>
+        </div>
+
+        <div class="hero-controls">
+          <div class="control-card metrics-card">
+            <div class="metric-row">
+              <span>Cards solved</span>
+              <strong id="cardsSolved">0</strong>
+            </div>
+            <div class="metric-row">
+              <span>Current streak</span>
+              <strong id="currentStreak">0</strong>
+            </div>
+            <div class="metric-row">
+              <span>Accuracy</span>
+              <strong id="accuracyValue">0%</strong>
+            </div>
+            <div class="metric-row">
+              <span>Avg answer time</span>
+              <strong id="avgResponseValue">0.0s</strong>
+            </div>
+            <button id="resetSessionButton" class="ghost-button" type="button">Reset session</button>
+          </div>
+
+          <div class="control-card">
+            <p class="control-label">Mastery rule</p>
+            <p class="microcopy">
+              Each cell in the chart keeps its own mastery score. Wrong answers lower it immediately. Correct answers
+              raise it, but fast correct answers raise it more.
+            </p>
+            <div class="speed-band-list" aria-label="Speed bands">
+              <div class="speed-band">
+                <strong>Under 2.5s</strong>
+                <span>Strong lock-in</span>
+              </div>
+              <div class="speed-band">
+                <strong>2.5s to 4.5s</strong>
+                <span>Correct, but still fragile</span>
+              </div>
+              <div class="speed-band">
+                <strong>Over 4.5s</strong>
+                <span>Comes back soon</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section class="learn-grid possessive-learn-grid">
+        <article class="rule-card panel matrix-panel">
+          <p class="section-kicker">The chart</p>
+          <h2>Possessor chooses the family. Noun chooses the ending.</h2>
+          <p>
+            Use the row for the owner, then use the noun column. Some rows never change:
+            <span class="inline-ru">его, её, их</span> stay the same across all four columns.
+          </p>
+          <div class="reference-matrix" id="referenceMatrix" aria-label="Possessive reference chart"></div>
+        </article>
+
+        <article class="rule-card panel">
+          <p class="section-kicker">How to read it</p>
+          <h2>Two fast decisions</h2>
+          <ul class="rule-list">
+            <li><span class="inline-ru">я / ты / мы / вы</span> take families that change by column</li>
+            <li><span class="inline-ru">он / оно</span> share <span class="inline-ru">его</span></li>
+            <li><span class="inline-ru">она</span> stays <span class="inline-ru">её</span></li>
+            <li><span class="inline-ru">они</span> stays <span class="inline-ru">их</span></li>
+            <li>Masculine, feminine, neuter, and plural nouns each pull a different ending</li>
+          </ul>
+        </article>
+
+        <aside class="coach-card panel">
+          <p class="section-kicker">Training loop</p>
+          <h2>Built for quick retrieval</h2>
+          <ol class="loop-list">
+            <li>Warm up the changing families first.</li>
+            <li>Mix the full chart once the endings stop wobbling.</li>
+            <li>Track each chart cell separately, not just the overall score.</li>
+            <li>Bring back slow or missed cells sooner.</li>
+            <li>Finish with mixed nouns so the chart works outside the table.</li>
+          </ol>
+          <div class="note-banner">
+            <strong>Important:</strong> mastery is accuracy plus speed. A cell is only steady when you can reach it
+            fast.
+          </div>
+        </aside>
+      </section>
+
+      <section class="panel practice-panel" id="practice">
+        <div class="panel-heading">
+          <div>
+            <p class="section-kicker">Interactive drill</p>
+            <h2 id="phaseTitle">Step 1: Ending warm-up</h2>
+          </div>
+          <div class="phase-status">
+            <span class="status-pill" id="phasePill">Warm-up</span>
+            <span class="phase-progress" id="phaseProgress">0 / 20 mastered</span>
+          </div>
+        </div>
+
+        <div class="practice-grid">
+          <article class="prompt-card">
+            <div class="prompt-toolbar">
+              <div class="meta-stack">
+                <span class="mode-badge" id="modeBadge">Warm-up</span>
+              </div>
+              <button id="audioButton" class="icon-button" type="button">Listen</button>
+            </div>
+
+            <div class="prompt-body">
+              <p class="prompt-label" id="promptLabel">Build the phrase</p>
+              <div id="promptText" class="prompt-text"></div>
+              <p class="translation-line" id="translationLine"></p>
+              <div class="prompt-chip-row" id="promptChipRow"></div>
+              <p id="subPrompt" class="sub-prompt"></p>
+              <p id="choiceNudge" class="choice-nudge">Tap the correct form below.</p>
+            </div>
+
+            <div class="hint-row">
+              <button id="hintButton" class="ghost-button" type="button">Reveal hint</button>
+              <span id="hintText" class="hint-text" aria-live="polite"></span>
+            </div>
+
+            <div class="practice-options">
+              <p class="sidebar-kicker">Choose The Form</p>
+              <div id="optionsGrid" class="options-grid practice-options-grid" aria-label="Answer choices"></div>
+            </div>
+
+            <div class="feedback-card" id="feedbackCard" aria-live="polite">
+              <p class="feedback-title">Pick an answer to see the logic.</p>
+              <p class="feedback-body">The explanation will tell you whether you missed the owner, the noun type, or speed.</p>
+            </div>
+
+            <div class="action-row">
+              <button id="nextButton" class="primary-button" type="button" disabled>Next card</button>
+            </div>
+          </article>
+
+          <aside class="sidebar-stack">
+            <article class="sidebar-card">
+              <p class="sidebar-kicker">Mastery by family</p>
+              <div class="family-mastery-grid" id="familyMasteryGrid"></div>
+            </article>
+
+            <article class="sidebar-card">
+              <p class="sidebar-kicker">Most fragile cells</p>
+              <div id="weakSpotList" class="weak-spot-list"></div>
+            </article>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel anchor-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-kicker">Lock it in</p>
+            <h2>Memory anchors</h2>
+          </div>
+        </div>
+
+        <div class="anchor-grid">
+          <article class="anchor-card">
+            <p class="anchor-label">Masculine</p>
+            <p class="anchor-quote inline-ru">мой брат, твой учитель, наш словарь</p>
+            <p class="anchor-tip">Same noun column, different owners.</p>
+          </article>
+
+          <article class="anchor-card">
+            <p class="anchor-label">Feminine</p>
+            <p class="anchor-quote inline-ru">моя сестра, её машина, ваша книга</p>
+            <p class="anchor-tip">The noun decides the feminine ending.</p>
+          </article>
+
+          <article class="anchor-card">
+            <p class="anchor-label">Neuter</p>
+            <p class="anchor-quote inline-ru">моё письмо, его окно, наше море</p>
+            <p class="anchor-tip">Neuter is the fastest place to lose track of endings, so it gets recycled hard.</p>
+          </article>
+
+          <article class="anchor-card">
+            <p class="anchor-label">Plural</p>
+            <p class="anchor-quote inline-ru">мои друзья, их ключи, ваши книги</p>
+            <p class="anchor-tip">Plural nouns point straight to the plural column.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel settings-panel">
+        <details class="settings-details">
+          <summary class="settings-summary-row">
+            <div>
+              <p class="section-kicker">Trainer settings</p>
+              <h2>Saved on this device</h2>
+            </div>
+            <span class="settings-summary" id="settingsSummary">Automatic step</span>
+          </summary>
+
+          <div class="settings-body">
+            <p class="settings-note" id="memoryNote">Progress, current card, and settings resume automatically on this device.</p>
+
+            <label class="settings-label" for="phaseOverrideSelect">Jump to step</label>
+            <select id="phaseOverrideSelect" class="settings-select">
+              <option value="auto">Automatic</option>
+              <option value="warmup">Step 1: Warm-up</option>
+              <option value="matrix">Step 2: Chart lab</option>
+              <option value="mastery">Step 3: Timed mastery</option>
+            </select>
+          </div>
+        </details>
+      </section>
+    </main>
+
+    <script type="module" src="./possessives.js"></script>
+  </body>
+</html>
