@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="A focused Russian plural trainer with mastery and response-speed tracking."
+    />
+    <title>Russian Plural Trainer</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;700&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true">
+      <div class="orb orb-a"></div>
+      <div class="orb orb-b"></div>
+      <div class="grid-wash"></div>
+    </div>
+
+    <main class="app-shell">
+      <header class="hero panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Russian Plurals Sprint</p>
+          <h1>Master <span>множественное число</span></h1>
+          <p class="lede">
+            This trainer makes plural forms automatic. It tracks not just whether you were right, but how
+            quickly you got there.
+          </p>
+
+          <div class="hero-links">
+            <a class="ghost-link" href="../">Open tense trainer</a>
+            <a class="ghost-link" href="#practice">Jump to drill</a>
+          </div>
+        </div>
+
+        <div class="hero-metrics">
+          <article class="metric-card">
+            <span>Cards solved</span>
+            <strong id="cardsSolved">0</strong>
+          </article>
+          <article class="metric-card">
+            <span>Accuracy</span>
+            <strong id="accuracyValue">0%</strong>
+          </article>
+          <article class="metric-card">
+            <span>Avg correct</span>
+            <strong id="avgCorrectSpeed">0.0s</strong>
+          </article>
+          <article class="metric-card">
+            <span>Steady nouns</span>
+            <strong id="steadyNouns">0</strong>
+          </article>
+
+          <div class="metric-footer">
+            <span>Fast within target</span>
+            <strong id="fastCorrectRate">0%</strong>
+          </div>
+
+          <button id="resetSessionButton" class="ghost-button" type="button">Reset progress</button>
+        </div>
+      </header>
+
+      <section class="panel practice-panel" id="practice">
+        <div class="panel-heading">
+          <div>
+            <p class="section-kicker">Interactive drill</p>
+            <h2 id="phaseTitle">Step 1: Regular endings</h2>
+          </div>
+          <div class="phase-status">
+            <span class="status-pill" id="phasePill">Regular endings</span>
+            <span class="phase-progress" id="phaseProgress">0 / 11 seen</span>
+          </div>
+        </div>
+
+        <div class="practice-grid">
+          <article class="prompt-card" id="drillCard">
+            <div class="prompt-toolbar">
+              <span class="mode-badge" id="modeBadge">Regular drill</span>
+              <span class="timer-chip" id="timerChip">0.0s</span>
+            </div>
+
+            <div class="prompt-body">
+              <p class="prompt-label">Singular noun</p>
+              <div class="prompt-word" id="promptWord">студент</div>
+              <p class="prompt-gloss" id="promptGloss">student</p>
+              <p class="prompt-direction" id="promptDirection">Choose the correct plural form below.</p>
+            </div>
+
+            <div class="hint-row">
+              <button id="hintButton" class="ghost-button" type="button">Reveal rule</button>
+              <span id="hintText" class="hint-text" aria-live="polite"></span>
+            </div>
+
+            <div class="practice-options">
+              <p class="sidebar-kicker">Choose The Plural</p>
+              <div id="optionsGrid" class="options-grid" aria-label="Plural choices"></div>
+            </div>
+
+            <div class="feedback-card" id="feedbackCard" aria-live="polite">
+              <p class="feedback-title">Pick an answer to see the rule and your time.</p>
+              <p class="feedback-body">Fast and correct matters more than slow recognition.</p>
+            </div>
+
+            <div class="action-row">
+              <button id="nextButton" class="primary-button" type="button" disabled>Next card</button>
+            </div>
+          </article>
+
+          <aside class="sidebar-stack">
+            <article class="sidebar-card">
+              <p class="sidebar-kicker">Pattern mastery</p>
+              <div class="pattern-grid" id="patternGrid"></div>
+            </article>
+
+            <article class="sidebar-card">
+              <p class="sidebar-kicker">Needs attention</p>
+              <div class="weak-list" id="weakList"></div>
+            </article>
+          </aside>
+        </div>
+      </section>
+
+      <section class="reference-grid">
+        <article class="panel reference-card">
+          <p class="section-kicker">Regular endings</p>
+          <h2>Normal rules</h2>
+          <ul class="reference-list">
+            <li><span class="inline-ru">студент → студенты</span>, <span class="inline-ru">музей → музеи</span>, <span class="inline-ru">автомобиль → автомобили</span></li>
+            <li><span class="inline-ru">актриса → актрисы</span>, <span class="inline-ru">неделя → недели</span>, <span class="inline-ru">станция → станции</span>, <span class="inline-ru">дверь → двери</span></li>
+            <li><span class="inline-ru">место → места</span>, <span class="inline-ru">здание → здания</span></li>
+            <li>After <span class="inline-ru">г, к, х, ж, ч, ш, щ</span>, use <span class="inline-ru">-и</span>: <span class="inline-ru">книга → книги</span>, <span class="inline-ru">чашка → чашки</span></li>
+          </ul>
+        </article>
+
+        <article class="panel reference-card">
+          <p class="section-kicker">Tricky zone</p>
+          <h2>Stress and -а / -я plurals</h2>
+          <ul class="reference-list">
+            <li><span class="inline-ru">стол → столы́</span>, <span class="inline-ru">старик → старики́</span>, <span class="inline-ru">игра́ → и́гры</span>, <span class="inline-ru">рука́ → ру́ки</span></li>
+            <li><span class="inline-ru">сестра́ → сёстры</span>, <span class="inline-ru">окно́ → о́кна</span>, <span class="inline-ru">мо́ре → моря́</span></li>
+            <li>Some masculine nouns switch to <span class="inline-ru">-а / -я</span>: <span class="inline-ru">дом → дома́</span>, <span class="inline-ru">город → города́</span>, <span class="inline-ru">учитель → учителя́</span></li>
+          </ul>
+        </article>
+
+        <article class="panel reference-card">
+          <p class="section-kicker">Irregular memory</p>
+          <h2>Core irregulars and frozen forms</h2>
+          <ul class="reference-list">
+            <li><span class="inline-ru">брат → братья</span>, <span class="inline-ru">друг → друзья</span>, <span class="inline-ru">сын → сыновья</span>, <span class="inline-ru">время → времена́</span></li>
+            <li><span class="inline-ru">дочь → дочери</span>, <span class="inline-ru">мать → матери</span>, <span class="inline-ru">ребёнок → де́ти</span>, <span class="inline-ru">человек → лю́ди</span></li>
+            <li>Unchanged in the plural: <span class="inline-ru">бюро</span>, <span class="inline-ru">метро</span>, <span class="inline-ru">такси</span>, <span class="inline-ru">кафе</span>, <span class="inline-ru">кофе</span></li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="panel settings-panel">
+        <details class="settings-details">
+          <summary class="settings-summary-row">
+            <div>
+              <p class="section-kicker">Trainer settings</p>
+              <h2>Saved on this device</h2>
+            </div>
+            <span class="settings-summary" id="settingsSummary">Automatic step</span>
+          </summary>
+
+          <div class="settings-body">
+            <p class="settings-note" id="memoryNote">
+              Progress, timing history, and the current card resume automatically on this device.
+            </p>
+
+            <label class="settings-label" for="phaseOverrideSelect">Jump to step</label>
+            <select id="phaseOverrideSelect" class="settings-select">
+              <option value="auto">Automatic</option>
+              <option value="regular">Step 1: Regular endings</option>
+              <option value="tricky">Step 2: Stress and tricky shifts</option>
+              <option value="irregular">Step 3: Irregular plurals</option>
+              <option value="mastery">Step 4: Mixed mastery</option>
+            </select>
+          </div>
+        </details>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
