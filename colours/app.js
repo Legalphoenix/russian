@@ -871,7 +871,6 @@ function optionMarkup(item, option) {
         ${solved ? "disabled" : ""}
       >
         <strong>${escapeHtml(family.forms.masculine)}</strong>
-        <span>${escapeHtml(family.english)}</span>
       </button>
     `;
   }
@@ -1062,7 +1061,6 @@ function renderMastery() {
             <span class="swatch-dot" style="${swatchStyle(family)}"></span>
             <div>
               <strong>${escapeHtml(family.forms.masculine)}</strong>
-              <span>${escapeHtml(family.english)}</span>
             </div>
           </div>
           <div class="mastery-track">
