@@ -382,6 +382,13 @@ select {
   gap: 0.65rem;
 }
 
+.toolbar-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+}
+
 .status-pill,
 .mode-badge,
 .timer-pill {
@@ -408,6 +415,11 @@ select {
   background: rgba(77, 127, 212, 0.1);
   color: var(--sky);
   font-weight: 700;
+}
+
+.timer-pill.is-paused {
+  background: rgba(215, 166, 52, 0.18);
+  color: #8a6411;
 }
 
 .practice-grid {
@@ -670,6 +682,16 @@ select {
   padding: 0.82rem 1rem;
   background: rgba(32, 25, 21, 0.05);
   color: var(--ink);
+}
+
+.pause-button {
+  background: rgba(215, 166, 52, 0.14);
+  color: #8a6411;
+}
+
+.pause-button.is-active {
+  background: rgba(77, 145, 84, 0.14);
+  color: var(--leaf);
 }
 
 .feedback-card {

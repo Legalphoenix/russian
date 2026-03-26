@@ -351,6 +351,7 @@ const el = {
   modeBadge: document.querySelector("#modeBadge"),
   liveTimer: document.querySelector("#liveTimer"),
   audioButton: document.querySelector("#audioButton"),
+  pauseTimerButton: document.querySelector("#pauseTimerButton"),
   promptLabel: document.querySelector("#promptLabel"),
   promptTitle: document.querySelector("#promptTitle"),
   promptStage: document.querySelector("#promptStage"),
@@ -418,6 +419,8 @@ const defaultState = {
   currentChoice: null,
   hintVisible: false,
   cardStartedAt: 0,
+  cardElapsedOffsetMs: 0,
+  timerPaused: false,
   lastResponseMs: null,
   savedAt: null,
   totalAnswered: 0,
@@ -472,6 +475,8 @@ function mergeState(candidate) {
   merged.currentChoice = typeof source.currentChoice === "string" ? source.currentChoice : null;
   merged.hintVisible = Boolean(source.hintVisible);
   merged.cardStartedAt = safeNumber(source.cardStartedAt);
+  merged.cardElapsedOffsetMs = safeNumber(source.cardElapsedOffsetMs);
+  merged.timerPaused = Boolean(source.timerPaused);
   merged.lastResponseMs = safeNullableNumber(source.lastResponseMs);
   merged.savedAt = safeNullableNumber(source.savedAt);
   merged.totalAnswered = safeNumber(source.totalAnswered);
@@ -526,7 +531,7 @@ function mergeState(candidate) {
     }),
   );
 
-  if (merged.currentItemId && !merged.currentSolved) {
+  if (merged.currentItemId && !merged.currentSolved && !merged.timerPaused) {
     merged.cardStartedAt = Date.now();
     merged.lastResponseMs = null;
   }
@@ -802,6 +807,12 @@ function getAnswerLabel(item) {
   return familyById[item.answerKey].forms.masculine;
 }
 
+function currentElapsedMs() {
+  if (state.currentSolved) return state.lastResponseMs || 0;
+  if (state.timerPaused) return state.cardElapsedOffsetMs || 0;
+  return (state.cardElapsedOffsetMs || 0) + Math.max(0, Date.now() - (state.cardStartedAt || Date.now()));
+}
+
 function speedSummary(responseMs) {
   if (responseMs < 2600) return "That speed pushes this family toward automatic recall.";
   if (responseMs < 4200) return "Accurate, but there is still room to make the retrieval faster.";
@@ -838,6 +849,7 @@ function optionMarkup(item, option) {
   const answer = item.answerKey;
   const selected = state.currentChoice === option;
   const solved = state.currentSolved;
+  const disabled = solved || state.timerPaused;
   let classes = `option-button ${item.kind === "audio" ? "option-swatch" : "option-text"}`;
 
   if (selected) classes += " is-selected";
@@ -852,7 +864,7 @@ function optionMarkup(item, option) {
         type="button"
         data-option="${escapeHtml(option)}"
         aria-label="${escapeHtml(family.forms.masculine)}"
-        ${solved ? "disabled" : ""}
+        ${disabled ? "disabled" : ""}
       >
         <span class="option-swatch-surface" style="${swatchStyle(family)}"></span>
         <span class="option-swatch-label">${solved ? escapeHtml(family.forms.masculine) : "&nbsp;"}</span>
@@ -868,7 +880,7 @@ function optionMarkup(item, option) {
         class="${classes}"
         type="button"
         data-option="${escapeHtml(option)}"
-        ${solved ? "disabled" : ""}
+        ${disabled ? "disabled" : ""}
       >
         <strong>${escapeHtml(family.forms.masculine)}</strong>
       </button>
@@ -882,7 +894,7 @@ function optionMarkup(item, option) {
       class="${classes}"
       type="button"
       data-option="${escapeHtml(option)}"
-      ${solved ? "disabled" : ""}
+      ${disabled ? "disabled" : ""}
     >
       <strong>${escapeHtml(option)}</strong>
       <span>${escapeHtml(FORM_META[formKey].short)}</span>
@@ -1001,11 +1013,16 @@ function renderPrompt() {
   el.subPrompt.textContent = subPromptForItem(item);
   el.choiceNudge.textContent = state.currentSolved
     ? "Review the explanation, then move on to the next card."
-    : choiceNudgeForItem(item);
+    : state.timerPaused
+      ? "Timer paused. Resume when you're ready to continue this card."
+      : choiceNudgeForItem(item);
   el.hintButton.textContent = state.hintVisible ? "Hide hint" : "Reveal hint";
   el.hintText.textContent = state.hintVisible ? hintForItem(item) : "";
   el.audioButton.textContent = item.kind === "audio" ? "Play phrase" : "Hear phrase";
   el.audioButton.disabled = !("speechSynthesis" in window);
+  el.pauseTimerButton.textContent = state.timerPaused ? "Resume timer" : "Pause timer";
+  el.pauseTimerButton.disabled = state.currentSolved;
+  el.pauseTimerButton.classList.toggle("is-active", state.timerPaused);
   renderLiveTimer();
 }
 
@@ -1106,8 +1123,9 @@ function renderSettings() {
 }
 
 function renderLiveTimer() {
-  const liveMs = state.currentSolved ? state.lastResponseMs || 0 : Math.max(0, Date.now() - (state.cardStartedAt || Date.now()));
-  el.liveTimer.textContent = `${formatSeconds(liveMs)} response`;
+  const liveMs = currentElapsedMs();
+  el.liveTimer.textContent = state.timerPaused ? `Paused at ${formatSeconds(liveMs)}` : `${formatSeconds(liveMs)} response`;
+  el.liveTimer.classList.toggle("is-paused", state.timerPaused);
 }
 
 function stopCardClock() {
@@ -1120,7 +1138,7 @@ function stopCardClock() {
 function startCardClock() {
   stopCardClock();
   renderLiveTimer();
-  if (!state.currentSolved) {
+  if (!state.currentSolved && !state.timerPaused) {
     timerHandle = window.setInterval(renderLiveTimer, 100);
   }
 }
@@ -1153,10 +1171,10 @@ function recordMetric(metric, correct, responseMs) {
 
 function submitAnswer(choice) {
   const item = currentItem();
-  if (!item || state.currentSolved) return;
+  if (!item || state.currentSolved || state.timerPaused) return;
 
   const correct = choice === item.answerKey;
-  const responseMs = Math.max(250, Date.now() - (state.cardStartedAt || Date.now()));
+  const responseMs = Math.max(250, currentElapsedMs());
   const itemStats = ensureItemStats(item.id);
   const familyStats = state.familyStats[item.familyId];
 
@@ -1217,8 +1235,30 @@ function startNextCard() {
   state.currentSolved = false;
   state.currentChoice = null;
   state.hintVisible = false;
+  state.timerPaused = false;
+  state.cardElapsedOffsetMs = 0;
   state.cardStartedAt = Date.now();
   state.lastResponseMs = null;
+  saveState();
+  render();
+  startCardClock();
+}
+
+function toggleTimerPause() {
+  if (state.currentSolved || !currentItem()) return;
+
+  if (state.timerPaused) {
+    state.timerPaused = false;
+    state.cardStartedAt = Date.now();
+  } else {
+    state.cardElapsedOffsetMs = currentElapsedMs();
+    state.timerPaused = true;
+    state.cardStartedAt = 0;
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
   saveState();
   render();
   startCardClock();
@@ -1263,6 +1303,10 @@ el.audioButton.addEventListener("click", () => {
   speakCurrentCard();
 });
 
+el.pauseTimerButton.addEventListener("click", () => {
+  toggleTimerPause();
+});
+
 el.phaseOverrideSelect.addEventListener("change", (event) => {
   state.phaseOverride = event.target.value;
   saveState();
@@ -1278,7 +1322,7 @@ if (!currentItem() || !itemMatchesActivePhase(currentItem()) || !isValidOptionOr
   startNextCard();
 } else {
   render();
-  if (state.currentSolved) {
+  if (state.currentSolved || state.timerPaused) {
     stopCardClock();
   } else {
     startCardClock();
