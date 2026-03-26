@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="A standalone mobile-friendly trainer for Russian colours, adjective endings, listening drills, and speed-based mastery."
+    />
+    <title>Russian Colour Studio</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true">
+      <div class="wash wash-red"></div>
+      <div class="wash wash-blue"></div>
+      <div class="wash wash-yellow"></div>
+      <div class="grain-grid"></div>
+    </div>
+
+    <main class="app-shell">
+      <nav class="page-nav panel" aria-label="Trainer pages">
+        <a class="page-nav-link" href="../index.html">был / буду Drill</a>
+        <a class="page-nav-link" href="../possessives.html">Possessives Matrix</a>
+        <a class="page-nav-link is-current" href="./index.html">Colour Studio</a>
+      </nav>
+
+      <header class="hero panel">
+        <div class="hero-copy">
+          <p class="eyebrow">Russian Colour Studio</p>
+          <h1>Master Russian colours <span>from swatch to sound</span></h1>
+          <p class="lede">
+            Learn each colour family, flex the adjective ending for masculine, feminine, neuter, and plural,
+            then prove it by ear. Mastery here is not just accuracy. Fast retrieval counts too.
+          </p>
+        </div>
+
+        <div class="hero-side">
+          <article class="control-card metrics-card">
+            <div class="metric-row">
+              <span>Cards solved</span>
+              <strong id="cardsSolved">0</strong>
+            </div>
+            <div class="metric-row">
+              <span>Current streak</span>
+              <strong id="currentStreak">0</strong>
+            </div>
+            <div class="metric-row">
+              <span>Accuracy</span>
+              <strong id="accuracyValue">0%</strong>
+            </div>
+            <div class="metric-row">
+              <span>Average response</span>
+              <strong id="averageTimeValue">0.0s</strong>
+            </div>
+            <button id="resetSessionButton" class="ghost-button" type="button">Reset session</button>
+          </article>
+
+          <article class="control-card spectrum-card">
+            <p class="control-label">Colour families at a glance</p>
+            <div id="spectrumStrip" class="spectrum-strip"></div>
+            <p class="microcopy">
+              Step 1 asks for the dictionary form. Step 2 bends the ending. Step 3 adds listening pressure.
+            </p>
+          </article>
+        </div>
+      </header>
+
+      <section class="learn-grid">
+        <article class="rule-card panel">
+          <p class="section-kicker">Step 1</p>
+          <h2>See the family first</h2>
+          <p>
+            When you look at a swatch, start with the masculine dictionary form:
+            <span class="inline-ru">красный</span>, <span class="inline-ru">синий</span>,
+            <span class="inline-ru">белый</span>.
+          </p>
+          <div class="note-stack">
+            <div class="note-chip">Visual cards train swatch to Russian recall.</div>
+            <div class="note-chip">You choose the base form before anything else changes.</div>
+          </div>
+        </article>
+
+        <article class="rule-card panel">
+          <p class="section-kicker">Step 2</p>
+          <h2>Then bend the ending</h2>
+          <p>
+            Russian colours behave like adjectives. The noun decides the ending:
+            masculine, feminine, neuter, or plural.
+          </p>
+          <div class="ending-row">
+            <span class="ending-pill">masc.</span>
+            <span class="ending-pill">fem.</span>
+            <span class="ending-pill">neut.</span>
+            <span class="ending-pill">plural</span>
+          </div>
+          <p class="microcopy">
+            Example family:
+            <span class="inline-ru">голубой, голубая, голубое, голубые</span>.
+          </p>
+        </article>
+
+        <aside class="coach-card panel">
+          <p class="section-kicker">Mastery logic</p>
+          <h2>Right and fast both matter</h2>
+          <ol class="loop-list">
+            <li>Accuracy tells you whether the colour family is stable.</li>
+            <li>Response time tells you whether retrieval is becoming automatic.</li>
+            <li>Weak or slow cards reappear sooner until the family settles.</li>
+            <li>Listening cards make the spoken form map back to the correct swatch.</li>
+          </ol>
+          <div class="note-banner">
+            <strong>Tracked separately:</strong> swatch reading, ending agreement, and listening retrieval.
+          </div>
+        </aside>
+      </section>
+
+      <section class="panel practice-panel" id="practice">
+        <div class="panel-heading">
+          <div>
+            <p class="section-kicker">Interactive drill</p>
+            <h2 id="phaseTitle">Step 1: Swatch to word</h2>
+          </div>
+          <div class="phase-status">
+            <span class="status-pill" id="phasePill">Visual</span>
+            <span class="phase-progress" id="phaseProgress">0 / 12 swatches named</span>
+          </div>
+        </div>
+
+        <div class="practice-grid">
+          <article class="prompt-card">
+            <div class="prompt-toolbar">
+              <div class="meta-stack">
+                <span class="mode-badge" id="modeBadge">Swatch read</span>
+                <span class="timer-pill" id="liveTimer">0.0s response</span>
+              </div>
+              <button id="audioButton" class="icon-button" type="button">Listen</button>
+            </div>
+
+            <div class="prompt-body">
+              <p class="prompt-label" id="promptLabel">Colour swatch</p>
+              <h3 class="prompt-title" id="promptTitle">Which Russian colour family is this?</h3>
+              <div id="promptStage" class="prompt-stage"></div>
+              <p id="subPrompt" class="sub-prompt"></p>
+              <p id="choiceNudge" class="choice-nudge">Tap the correct answer below.</p>
+            </div>
+
+            <div class="hint-row">
+              <button id="hintButton" class="ghost-button" type="button">Reveal hint</button>
+              <span id="hintText" class="hint-text" aria-live="polite"></span>
+            </div>
+
+            <div class="practice-options">
+              <p class="sidebar-kicker">Choose the answer</p>
+              <div id="optionsGrid" class="options-grid" aria-label="Answer choices"></div>
+            </div>
+
+            <div class="feedback-card" id="feedbackCard" aria-live="polite">
+              <p class="feedback-title">Pick an answer to see the logic.</p>
+              <p class="feedback-body">The review explains the colour family, the ending, and how your speed affected mastery.</p>
+            </div>
+
+            <div class="action-row">
+              <button id="nextButton" class="primary-button" type="button" disabled>Next card</button>
+            </div>
+          </article>
+
+          <aside class="sidebar-stack">
+            <article class="sidebar-card">
+              <p class="sidebar-kicker">Mastery by family</p>
+              <div id="masteryGrid" class="mastery-grid"></div>
+            </article>
+
+            <article class="sidebar-card">
+              <p class="sidebar-kicker">Most fragile right now</p>
+              <div id="weakSpotList" class="weak-spot-list"></div>
+            </article>
+          </aside>
+        </div>
+      </section>
+
+      <section class="panel atlas-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="section-kicker">Reference atlas</p>
+            <h2>All colour families and forms</h2>
+          </div>
+        </div>
+        <div id="atlasGrid" class="atlas-grid"></div>
+      </section>
+
+      <section class="panel settings-panel">
+        <details class="settings-details">
+          <summary class="settings-summary-row">
+            <div>
+              <p class="section-kicker">Trainer settings</p>
+              <h2>Saved on this device</h2>
+            </div>
+            <span class="settings-summary" id="settingsSummary">Automatic step</span>
+          </summary>
+
+          <div class="settings-body">
+            <p class="settings-note" id="memoryNote">
+              Progress, answer timing, current card, and settings resume automatically on this device.
+            </p>
+
+            <label class="settings-label" for="phaseOverrideSelect">Jump to step</label>
+            <select id="phaseOverrideSelect" class="settings-select">
+              <option value="auto">Automatic</option>
+              <option value="visual">Step 1: Swatch to word</option>
+              <option value="agreement">Step 2: Agreement lab</option>
+              <option value="mastery">Step 3: Listening + mastery</option>
+            </select>
+          </div>
+        </details>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
