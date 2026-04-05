@@ -835,21 +835,13 @@ function describeRecency(timestamp) {
 
 function buildRussianCardHtml(chunk) {
   if (state.settings.viewMode === "syllables") {
-    return `<p class="card-line is-syllables">${escapeHtml(chunk.syllabified)}</p>`;
+    return `<p class="card-line is-syllables-only">${escapeHtml(chunk.syllabified)}</p>`;
   }
 
   if (state.settings.viewMode === "both") {
     return `
-      <div class="card-stack">
-        <div class="stack-panel">
-          <p class="card-label">Normal</p>
-          <p class="card-line">${escapeHtml(chunk.russian)}</p>
-        </div>
-        <div class="stack-panel">
-          <p class="card-label">Syllables</p>
-          <p class="card-line is-syllables">${escapeHtml(chunk.syllabified)}</p>
-        </div>
-      </div>
+      <p class="card-line">${escapeHtml(chunk.russian)}</p>
+      <p class="assist-line">${escapeHtml(chunk.syllabified)}</p>
     `;
   }
 
@@ -858,7 +850,7 @@ function buildRussianCardHtml(chunk) {
 
 function getChunkHeading(chunk) {
   const sentence = sentenceById[chunk.sentenceId];
-  return `${sentence.label} · Chunk ${chunk.chunkIndex} of ${sentence.chunkIds.length}`;
+  return `${sentence.label} · ${chunk.chunkIndex}/${sentence.chunkIds.length}`;
 }
 
 function selectChunk(chunkId) {
@@ -970,10 +962,10 @@ function renderPractice() {
   elements.practiceCard.classList.toggle("is-english", cardFace === "english");
   elements.cardCaption.textContent =
     cardFace === "english"
-      ? "Tap to go back to Russian"
+      ? "Tap for Russian"
       : state.settings.viewMode === "both"
-        ? "Tap to show the English"
-        : "Tap to flip between Russian and English";
+        ? "Tap for English"
+        : "Tap for English";
   elements.cardBody.innerHTML =
     cardFace === "english"
       ? `<p class="english-line">${escapeHtml(chunk.english)}</p>`
@@ -995,21 +987,34 @@ function renderFocus() {
     const stats = getChunkStats(chunk.id);
     const averageRating = getAverageRating(stats);
     const recencyHours = stats.lastPracticedAt ? (Date.now() - stats.lastPracticedAt) / 3600000 : 240;
-    const weight =
-      (stats.attempts ? 0 : 44) +
-      (stats.lastRating ? (6 - stats.lastRating) * 12 : 8) +
-      (stats.attempts ? (5 - averageRating) * 16 : 0) +
-      Math.min(recencyHours, 240) * 0.2;
+    const practicedTier = stats.attempts ? 1 : 0;
+    const lastGap = stats.attempts ? Math.max(0, 4 - stats.lastRating) : 0;
+    const averageGap = stats.attempts ? Math.max(0, 4.2 - averageRating) : 0;
+    const staleFactor = stats.attempts ? Math.min(recencyHours, 240) / 24 : 0;
+    const newChunkBonus = stats.attempts ? 0 : 32;
+    const practicedPriority = stats.attempts ? (lastGap > 0 || averageGap > 0 ? 18 : recencyHours >= 96 ? 8 : 0) : 0;
+    const practicedWeakness =
+      stats.attempts
+        ? lastGap * 28 + averageGap * 18 + staleFactor * (lastGap > 0 || averageGap > 0 ? 6 : 2)
+        : 0;
+    const fresheningWeight = stats.attempts ? Math.max(0, 3 - stats.attempts) * 3 : 0;
+    const weight = newChunkBonus + practicedPriority + practicedWeakness + fresheningWeight;
 
     return {
       chunk,
       stats,
       weight,
+      practicedTier,
       averageRating,
       state: getChunkState(stats),
     };
   })
-    .sort((left, right) => right.weight - left.weight || chunkIndexById[left.chunk.id] - chunkIndexById[right.chunk.id])
+    .sort(
+      (left, right) =>
+        right.practicedTier - left.practicedTier ||
+        right.weight - left.weight ||
+        chunkIndexById[left.chunk.id] - chunkIndexById[right.chunk.id]
+    )
     .slice(0, 5);
 
   elements.focusList.innerHTML = ranked
