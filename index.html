@@ -16,6 +16,51 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .sister-suite-strip {
+        margin-top: 1.1rem;
+        display: grid;
+        gap: 0.75rem;
+        max-width: 60ch;
+        padding: 0.95rem 1rem;
+        border-radius: var(--radius-lg);
+        border: 1px solid rgba(49, 37, 28, 0.08);
+        background: rgba(255, 251, 244, 0.62);
+        backdrop-filter: blur(10px);
+      }
+
+      .sister-suite-label {
+        margin: 0;
+        text-transform: uppercase;
+        letter-spacing: 0.16em;
+        font-size: 0.74rem;
+        color: var(--accent-deep);
+      }
+
+      .sister-suite-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.65rem;
+      }
+
+      .sister-suite-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+      }
+
+      @media (max-width: 719px) {
+        .sister-suite-links {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .sister-suite-link {
+          width: 100%;
+        }
+      }
+    </style>
   </head>
   <body>
     <div class="backdrop" aria-hidden="true">
@@ -29,6 +74,8 @@
         <a class="page-nav-link is-current" href="./index.html">был / буду Drill</a>
         <a class="page-nav-link" href="./possessives.html">Possessives Matrix</a>
         <a class="page-nav-link" href="./colours/index.html">Colour Studio</a>
+        <a class="page-nav-link" href="./pronunciation/">Pronunciation Coach</a>
+        <a class="page-nav-link" href="./sentences/index.html">Sentence Coach</a>
       </nav>
 
       <header class="hero panel">
@@ -39,6 +86,13 @@
             This page trains the exact decision that matters each time: first the time clue, then the subject.
             Wrong answers come back quickly until the pattern sticks.
           </p>
+          <div class="sister-suite-strip" aria-label="Other study suites">
+            <p class="sister-suite-label">Other study suites</p>
+            <div class="sister-suite-links">
+              <a class="ghost-button sister-suite-link" href="/french/">French Study Suite</a>
+              <a class="ghost-button sister-suite-link" href="/swedish/">Swedish Study Suite</a>
+            </div>
+          </div>
         </div>
 
         <div class="hero-controls">

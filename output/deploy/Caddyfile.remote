@@ -1,0 +1,227 @@
+app.epobuddy.com {
+	encode gzip
+
+	@backend {
+		path /chatkit*
+		path /api*
+	}
+	handle @backend {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:5173
+	}
+}
+
+epobuddy.com www.epobuddy.com {
+	encode gzip
+	handle {
+		redir https://app.epobuddy.com{uri} permanent
+	}
+}
+
+wordai.macchiatolabs.ai {
+	encode gzip
+	handle_path /jd-admin* {
+		reverse_proxy 127.0.0.1:3022
+	}
+	handle /jd-legal* {
+		reverse_proxy https://127.0.0.1:3001 {
+			transport http {
+				tls_insecure_skip_verify
+			}
+		}
+	}
+
+	handle {
+		reverse_proxy https://127.0.0.1:3000 {
+			transport http {
+				tls_insecure_skip_verify
+			}
+		}
+	}
+}
+
+typing.159.223.236.244.sslip.io typing.macchiatolabs.ai {
+	encode gzip
+
+	handle_path /api/* {
+		reverse_proxy 127.0.0.1:8786
+	}
+
+	root * /srv/typing.macchiatolabs.ai
+	file_server
+}
+
+russian.159.223.236.244.sslip.io {
+	encode gzip
+
+	handle_path /sentences/api/* {
+		reverse_proxy 127.0.0.1:8787
+	}
+
+	handle_path /pronunciation/api/* {
+		reverse_proxy 127.0.0.1:8791
+	}
+
+	handle /pronunciation* {
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
+	root * /srv/russian.159.223.236.244.sslip.io
+	file_server
+}
+
+russian-hub.159.223.236.244.sslip.io index.macchiatolabs.ai {
+	encode gzip
+
+	handle /api* {
+		reverse_proxy 127.0.0.1:8790
+	}
+
+	handle /french* {
+		root * /srv/russian-hub.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle /swedish* {
+		root * /srv/russian-hub.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle /suite* {
+		root * /srv/russian-hub.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle /favicon.svg {
+		root * /srv/russian-hub.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle_path /tenses* {
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
+	@hub {
+		path / /index.html
+	}
+	handle @hub {
+		root * /srv/russian-hub.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle_path /index/sentences/api/* {
+		reverse_proxy 127.0.0.1:8787
+	}
+
+	handle_path /index/pronunciation/api/* {
+		reverse_proxy 127.0.0.1:8791
+	}
+
+	handle /index/sentences* {
+		uri strip_prefix /index
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle /index/pronunciation* {
+		uri strip_prefix /index
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle {
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+}
+
+macchiatolabs.ai {
+	encode gzip
+
+	handle /api* {
+		reverse_proxy 127.0.0.1:8790
+	}
+
+	handle /french* {
+		root * /srv/russian-hub.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle /swedish* {
+		root * /srv/russian-hub.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle /suite* {
+		root * /srv/russian-hub.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle /favicon.svg {
+		root * /srv/russian-hub.159.223.236.244.sslip.io
+		file_server
+	}
+
+	@hub path / /index /index/
+	handle @hub {
+		root * /srv/russian-hub.159.223.236.244.sslip.io
+		rewrite * /index.html
+		file_server
+	}
+
+	handle /index/tenses* {
+		uri replace /index/tenses /
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
+	@root_assets path /index/styles.css /index/app.js /index/favicon.svg /index/possessives.css /index/possessives.js /index/possessives.html
+	handle @root_assets {
+		uri strip_prefix /index
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle /index/plurals* {
+		uri strip_prefix /index
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle /index/colours* {
+		uri strip_prefix /index
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle_path /index/pronunciation/api/* {
+		reverse_proxy 127.0.0.1:8791
+	}
+
+	handle_path /index/sentences/api/* {
+		reverse_proxy 127.0.0.1:8787
+	}
+
+	handle /index/sentences* {
+		uri strip_prefix /index
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle /index/pronunciation* {
+		uri strip_prefix /index
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle {
+		root * /srv/russian-hub.159.223.236.244.sslip.io
+		rewrite * /index.html
+		file_server
+	}
+}

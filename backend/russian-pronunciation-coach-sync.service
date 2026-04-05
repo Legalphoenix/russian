@@ -1,0 +1,28 @@
+[Unit]
+Description=Russian Pronunciation Coach sync service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/opt/russian-pronunciation-coach
+StateDirectory=russian-pronunciation-coach
+ExecStart=/usr/bin/python3 /opt/russian-pronunciation-coach/backend/pronunciation_sync.py serve --host 127.0.0.1 --port 8791 --data-dir /var/lib/russian-pronunciation-coach
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

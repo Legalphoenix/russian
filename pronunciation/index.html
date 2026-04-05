@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="A mobile-first Russian pronunciation coach with syllable view, sentence flips, chunk ratings, and synced progress."
+    />
+    <title>Russian Pronunciation Coach</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true">
+      <div class="wash wash-a"></div>
+      <div class="wash wash-b"></div>
+      <div class="grain"></div>
+    </div>
+
+    <main class="app-shell">
+      <nav class="page-nav panel" aria-label="Trainer pages">
+        <a class="page-nav-link" href="../index.html">был / буду Drill</a>
+        <a class="page-nav-link" href="../possessives.html">Possessives Matrix</a>
+        <a class="page-nav-link" href="../colours/index.html">Colour Studio</a>
+        <a class="page-nav-link" href="../sentences/index.html">Sentence Coach</a>
+        <a class="page-nav-link is-current" href="./index.html">Pronunciation Coach</a>
+      </nav>
+
+      <header class="hero panel">
+        <div>
+          <p class="eyebrow">Russian Pronunciation Coach</p>
+          <h1>Practice one chunk at a time.</h1>
+          <p class="lede">
+            Flip between normal Russian, syllables, or both. Tap the card to reveal the English, rate how it sounded,
+            and jump back through the transcript whenever you need another pass.
+          </p>
+        </div>
+        <button id="reset-button" class="ghost-button" type="button">Reset progress</button>
+      </header>
+
+      <section class="progress-strip panel" aria-label="Progress">
+        <article class="metric-card">
+          <span class="metric-label">Current</span>
+          <strong id="current-progress">1 / 1</strong>
+          <span class="metric-note" id="current-progress-note">Sentence 1</span>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Rated</span>
+          <strong id="rated-progress">0 / 0</strong>
+          <span class="metric-note">Chunks with a score</span>
+        </article>
+        <article class="metric-card">
+          <span class="metric-label">Needs work</span>
+          <strong id="weak-progress">0</strong>
+          <span class="metric-note">Low or fragile ratings</span>
+        </article>
+      </section>
+
+      <section class="practice panel">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Current chunk</p>
+            <h2 id="chunk-heading">Sentence 1 · Chunk 1</h2>
+          </div>
+          <span id="chunk-state-pill" class="state-pill state-new">New</span>
+        </div>
+
+        <div class="view-toggle" role="radiogroup" aria-label="Russian display modes">
+          <button class="view-chip is-active" type="button" data-view-mode="normal" aria-pressed="true">
+            Normal
+          </button>
+          <button class="view-chip" type="button" data-view-mode="syllables" aria-pressed="false">
+            Syllables
+          </button>
+          <button class="view-chip" type="button" data-view-mode="both" aria-pressed="false">
+            Both
+          </button>
+        </div>
+
+        <button id="practice-card" class="practice-card" type="button">
+          <span id="card-caption" class="card-caption">Tap to show the English</span>
+          <div id="card-body" class="card-body"></div>
+        </button>
+
+        <div class="meta-row">
+          <article class="meta-card">
+            <span class="meta-label">Average rating</span>
+            <strong id="average-rating">--</strong>
+          </article>
+          <article class="meta-card">
+            <span class="meta-label">Last rating</span>
+            <strong id="last-rating">--</strong>
+          </article>
+          <article class="meta-card">
+            <span class="meta-label">Attempts</span>
+            <strong id="attempt-count">0</strong>
+          </article>
+        </div>
+
+        <div class="nav-row">
+          <button id="previous-button" class="ghost-button" type="button">Previous</button>
+          <span id="nav-status" class="nav-status">Chunk 1 of 1</span>
+          <button id="next-button" class="ghost-button" type="button">Next</button>
+        </div>
+
+        <section class="rating-panel" aria-labelledby="rating-heading">
+          <div class="rating-head">
+            <div>
+              <p class="section-kicker">Rating</p>
+              <h3 id="rating-heading">How did that one sound?</h3>
+            </div>
+            <p class="rating-key">1 = needs work · 5 = solid</p>
+          </div>
+          <div id="rating-row" class="rating-row" role="group" aria-label="Rate this chunk"></div>
+        </section>
+      </section>
+
+      <section class="focus panel">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Work next</p>
+            <h2>Weakest chunks first</h2>
+          </div>
+          <span class="section-note">Low ratings plus stale recency bubble up here.</span>
+        </div>
+        <div id="focus-list" class="focus-list"></div>
+      </section>
+
+      <section class="transcript panel">
+        <div class="section-head">
+          <div>
+            <p class="section-kicker">Transcript</p>
+            <h2>Entire write-up, still in order</h2>
+          </div>
+          <span class="section-note">Tap any chunk to practice it immediately.</span>
+        </div>
+        <div id="transcript-list" class="transcript-list"></div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
