@@ -529,6 +529,209 @@ const CHUNKS = [
   },
 ];
 
+const CHUNK_PHRASE_DATA = {
+  "s1-c1": {
+    phrases: ["И потом протокол", "про протокол", "протоколом запротоколировал,"],
+    syllablePhrases: ["И по-том про-то-кол", "про про-то-кол", "про-то-ко-лом за-про-то-ко-ли-ро-вал,"],
+  },
+  "s1-c2": {
+    phrases: ["как интервьюером", "интервьюируемый", "лигурийский регулировщик"],
+    syllablePhrases: ["как и-нте-рвью-е-ром", "и-нте-рвью-и-ру-е-мый", "ли-гу-ри-йский ре-гу-ли-ро-вщик"],
+  },
+  "s1-c3": {
+    phrases: ["речисто, да не чисто", "рапортовал,"],
+    syllablePhrases: ["ре-чи-сто, да не чи-сто", "ра-по-рто-вал,"],
+  },
+  "s1-c4": {
+    phrases: ["да так зарапортовался", "про размокропогодившуюся погоду"],
+    syllablePhrases: ["да так за-ра-по-рто-ва-лся", "про ра-змо-кро-по-го-ди-вшу-ю-ся по-го-ду"],
+  },
+  "s1-c5": {
+    phrases: ["что, дабы инцидент", "не стал претендентом", "на судебный прецедент,"],
+    syllablePhrases: ["что, да-бы и-нци-дент", "не стал пре-те-нде-нтом", "на су-де-бный пре-це-дент,"],
+  },
+  "s1-c6": {
+    phrases: ["лигурийский регулировщик", "акклиматизировался"],
+    syllablePhrases: ["ли-гу-ри-йский ре-гу-ли-ро-вщик", "а-ккли-ма-ти-зи-ро-ва-лся"],
+  },
+  "s1-c7": {
+    phrases: ["в неконституционном", "Константинополе,"],
+    syllablePhrases: ["в не-ко-нсти-ту-ци-о-нном", "Ко-нста-нти-но-по-ле,"],
+  },
+  "s1-c8": {
+    phrases: ["где хохлатые хохотушки", "хохотом хохотали"],
+    syllablePhrases: ["где хо-хла-ты-е хо-хо-ту-шки", "хо-хо-том хо-хо-та-ли"],
+  },
+  "s1-c9": {
+    phrases: ["и кричали турке,", "который начерно обкурен трубкой:"],
+    syllablePhrases: ["и кри-ча-ли ту-рке,", "ко-то-рый на-че-рно о-бку-рен тру-бкой:"],
+  },
+  "s1-c10": {
+    phrases: ['"Не кури, турка', "трубку,"],
+    syllablePhrases: ['"Не ку-ри, ту-рка', "тру-бку,"],
+  },
+  "s1-c11": {
+    phrases: ["купи лучше кипу пик,", "лучше пик кипу купи,"],
+    syllablePhrases: ["ку-пи лу-чше ки-пу пик,", "лу-чше пик ки-пу ку-пи,"],
+  },
+  "s1-c12": {
+    phrases: ["а то придет бомбардир", "из Бранденбурга –"],
+    syllablePhrases: ["а то при-дет бо-мба-рдир", "из Бра-нде-нбу-рга –"],
+  },
+  "s1-c13": {
+    phrases: ["бомбами забомбардирует", "за то, что некто чернорылый", "у него полдвора рылом изрыл вырыл и подрыл."],
+    syllablePhrases: ["бо-мба-ми за-бо-мба-рди-ру-ет", "за то, что не-кто че-рно-ры-лый", "у не-го по-лдво-ра ры-лом и-зрыл вы-рыл и по-дрыл."],
+  },
+  "s2-c1": {
+    phrases: ["Но на самом деле", "турка не был в деле,"],
+    syllablePhrases: ["Но на са-мом де-ле", "ту-рка не был в де-ле,"],
+  },
+  "s2-c2": {
+    phrases: ["да и Клара-краля", "в то время кралась к ларю,"],
+    syllablePhrases: ["да и Кла-ра-кра-ля", "в то вре-мя кра-лась к ла-рю,"],
+  },
+  "s2-c3": {
+    phrases: ["пока Карл у Клары крал кораллы,"],
+    syllablePhrases: ["по-ка Карл у Кла-ры крал ко-ра-ллы,"],
+  },
+  "s2-c4": {
+    phrases: ["за что Клара у Карла украла кларнет,"],
+    syllablePhrases: ["за что Кла-ра у Ка-рла у-кра-ла кла-рнет,"],
+  },
+  "s2-c5": {
+    phrases: ["а потом на дворе", "дёготниковой вдовы Варвары"],
+    syllablePhrases: ["а по-том на дво-ре", "дё-го-тни-ко-вой вдо-вы Ва-рва-ры"],
+  },
+  "s2-c6": {
+    phrases: ["два этих вора дрова воровали;"],
+    syllablePhrases: ["два э-тих во-ра дро-ва во-ро-ва-ли;"],
+  },
+  "s2-c7": {
+    phrases: ["но грех – не смех –", "не уложить в орех:"],
+    syllablePhrases: ["но грех – не смех –", "не у-ло-жить в о-рех:"],
+  },
+  "s2-c8": {
+    phrases: ["о Кларе с Карлом во мраке", "все раки шумели в драке, –"],
+    syllablePhrases: ["о Кла-ре с Ка-рлом во мра-ке", "все ра-ки шу-ме-ли в дра-ке, –"],
+  },
+  "s2-c9": {
+    phrases: ["вот и не до бомбардира", "ворам было,", "но и не до деготниковой вдовы, и не до деготниковых детей."],
+    syllablePhrases: ["вот и не до бо-мба-рди-ра", "во-рам бы-ло,", "но и не до де-го-тни-ко-вой вдо-вы, и не до де-го-тни-ко-вых де-тей."],
+  },
+  "s3-c1": {
+    phrases: ["Зато рассердившаяся вдова", "убрала в сарай дрова:"],
+    syllablePhrases: ["За-то ра-ссе-рди-вша-я-ся вдо-ва", "у-бра-ла в са-рай дро-ва:"],
+  },
+  "s3-c2": {
+    phrases: ["раз дрова, два дрова, три дрова –"],
+    syllablePhrases: ["раз дро-ва, два дро-ва, три дро-ва –"],
+  },
+  "s3-c3": {
+    phrases: ["не вместились все дрова,"],
+    syllablePhrases: ["не вме-сти-лись все дро-ва,"],
+  },
+  "s3-c4": {
+    phrases: ["и два дровосека, два дровокола,", "два дроворуба"],
+    syllablePhrases: ["и два дро-во-се-ка, два дро-во-ко-ла,", "два дро-во-ру-ба"],
+  },
+  "s3-c5": {
+    phrases: ["для расчувствовавшейся Варвары", "выдворили дрова"],
+    syllablePhrases: ["для ра-счу-вство-ва-вше-йся Ва-рва-ры", "вы-дво-ри-ли дро-ва"],
+  },
+  "s3-c6": {
+    phrases: ["вширь двора обратно на дровяной двор,", "где цапля чахла,", "цапля сохла,", "цапля сдохла."],
+    syllablePhrases: ["вширь дво-ра о-бра-тно на дро-вя-ной двор,", "где ца-пля ча-хла,", "ца-пля со-хла,", "ца-пля сдо-хла."],
+  },
+  "s4-c1": {
+    phrases: ["Цыплёнок же цапли", "цепко цеплялся за цепь."],
+    syllablePhrases: ["Цы-плё-нок же ца-пли", "це-пко це-пля-лся за цепь."],
+  },
+  "s5-c1": {
+    phrases: ["Молодец против овец,", "а против молодца сам овца,"],
+    syllablePhrases: ["Мо-ло-дец про-тив о-вец,", "а про-тив мо-ло-дца сам о-вца,"],
+  },
+  "s5-c2": {
+    phrases: ["которой носит Сеня сено в сани,", "потом везет Сенька Соньку с Санькой на санках:"],
+    syllablePhrases: ["ко-то-рой но-сит Се-ня се-но в са-ни,", "по-том ве-зет Се-нька Со-ньку с Са-нькой на са-нках:"],
+  },
+  "s5-c3": {
+    phrases: ["санки – скок,", "Сеньку – в бок,", "Соньку – в лоб,", "все – в сугроб,", "а оттуда только шапкой шишки сшиб,"],
+    syllablePhrases: ["са-нки – скок,", "Се-ньку – в бок,", "Со-ньку – в лоб,", "все – в су-гроб,", "а о-тту-да то-лько ша-пкой ши-шки сшиб,"],
+  },
+  "s5-c4": {
+    phrases: ["затем по шоссе Саша пошёл,", "Сашу на шоссе Саша нашёл;"],
+    syllablePhrases: ["за-тем по шо-ссе Са-ша по-шёл,", "Са-шу на шо-ссе Са-ша на-шёл;"],
+  },
+  "s5-c5": {
+    phrases: ["Сонька же – Сашкина подружка", "шла по шоссе", "и сосала сушку,"],
+    syllablePhrases: ["Со-нька же – Са-шки-на по-дру-жка", "шла по шо-ссе", "и со-са-ла су-шку,"],
+  },
+  "s5-c6": {
+    phrases: ["да притом у Соньки-вертушки", "во рту ещё и три ватрушки –", "аккурат в медовик,"],
+    syllablePhrases: ["да при-том у Со-ньки-ве-рту-шки", "во рту е-щё и три ва-тру-шки –", "а-кку-рат в ме-до-вик,"],
+  },
+  "s5-c7": {
+    phrases: ["но ей не до медовика –", "Сонька и с ватрушками во рту", "пономаря перепономарит,", "перевыпономарит:"],
+    syllablePhrases: ["но ей не до ме-до-ви-ка –", "Со-нька и с ва-тру-шка-ми во рту", "по-но-ма-ря пе-ре-по-но-ма-рит,", "пе-ре-вы-по-но-ма-рит:"],
+  },
+  "s5-c8": {
+    phrases: ["жужжит, как жужелица,", "жужжит, да кружится:"],
+    syllablePhrases: ["жу-жжит, как жу-же-ли-ца,", "жу-жжит, да кру-жи-тся:"],
+  },
+  "s5-c9": {
+    phrases: ["была у Фрола –", "Фролу на Лавра наврала,", "пойдет к Лавру на Фрола Лавру наврет,"],
+    syllablePhrases: ["бы-ла у Фро-ла –", "Фро-лу на Ла-вра на-вра-ла,", "по-йдет к Ла-вру на Фро-ла Ла-вру на-врет,"],
+  },
+  "s5-c10": {
+    phrases: ["что – вахмистр с вахмистршей,", "ротмистр с ротмистршей,", "у ужа – ужата,", "у ежа – ежата,"],
+    syllablePhrases: ["что – ва-хмистр с ва-хми-стршей,", "ро-тмистр с ро-тми-стршей,", "у у-жа – у-жа-та,", "у е-жа – е-жа-та,"],
+  },
+  "s5-c11": {
+    phrases: ["а у него высокопоставленный гость", "унес трость,"],
+    syllablePhrases: ["а у не-го вы-со-ко-по-ста-вле-нный гость", "у-нес трость,"],
+  },
+  "s5-c12": {
+    phrases: ["и вскоре опять пять ребят съели пять опят", "с полчетвертью четверика чечевицы без червоточины,"],
+    syllablePhrases: ["и вско-ре о-пять пять ре-бят съе-ли пять о-пят", "с по-лче-тве-ртью че-тве-ри-ка че-че-ви-цы без че-рво-то-чи-ны,"],
+  },
+  "s5-c13": {
+    phrases: ["да тысячу шестьсот шестьдесят шесть пирогов", "с творогом из сыворотки из-под простокваши,"],
+    syllablePhrases: ["да ты-ся-чу ше-стьсот ше-стьде-сят шесть пи-ро-гов", "с тво-ро-гом из сы-во-ро-тки из-под про-сто-ква-ши,"],
+  },
+  "s5-c14": {
+    phrases: ["– о всем о том около кола колокола", "звоном раззванивали,"],
+    syllablePhrases: ["– о всем о том о-ко-ло ко-ла ко-ло-ко-ла", "зво-ном ра-ззва-ни-ва-ли,"],
+  },
+  "s5-c15": {
+    phrases: ["да так, что даже Константин –"],
+    syllablePhrases: ["да так, что да-же Ко-нста-нтин –"],
+  },
+  "s5-c16": {
+    phrases: ["зальцбуржский бссперспективняк", "из-под бронетранспортера"],
+    syllablePhrases: ["за-льцбу-ржский бсспе-рспе-кти-вняк", "из-под бро-не-тра-нспо-рте-ра"],
+  },
+  "s5-c17": {
+    phrases: ["констатировал:", "как все колокола не переколоколовать,"],
+    syllablePhrases: ["ко-нста-ти-ро-вал:", "как все ко-ло-ко-ла не пе-ре-ко-ло-ко-ло-вать,"],
+  },
+  "s5-c18": {
+    phrases: ["не перевыколоколовать,", "так и всех скороговорок не перескороговорить,"],
+    syllablePhrases: ["не пе-ре-вы-ко-ло-ко-ло-вать,", "так и всех ско-ро-го-во-рок не пе-ре-ско-ро-го-во-рить,"],
+  },
+  "s5-c19": {
+    phrases: ["не перевыскороговорить;"],
+    syllablePhrases: ["не пе-ре-вы-ско-ро-го-во-рить;"],
+  },
+  "s5-c20": {
+    phrases: ["но попытка – не пытка."],
+    syllablePhrases: ["но по-пы-тка – не пы-тка."],
+  },
+};
+
+CHUNKS.forEach((chunk) => {
+  Object.assign(chunk, CHUNK_PHRASE_DATA[chunk.id] || {});
+});
+
 const chunkById = Object.fromEntries(CHUNKS.map((chunk) => [chunk.id, chunk]));
 const chunkIndexById = Object.fromEntries(CHUNKS.map((chunk, index) => [chunk.id, index]));
 const sentenceById = Object.fromEntries(SENTENCES.map((sentence) => [sentence.id, sentence]));
@@ -803,28 +1006,41 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-const TEXT_TOKEN_PATTERN = /[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*|\s+|[^\s\p{L}\p{N}]/gu;
+const PHRASE_TOKEN_PATTERN = /[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*|\s+|[^\s\p{L}\p{N}]/gu;
 const WORD_TOKEN_PATTERN = /^[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*$/u;
 
-function buildWordStyledText(text, tone = "normal") {
-  const tokens = String(text).match(TEXT_TOKEN_PATTERN) ?? [String(text)];
-  let wordIndex = 0;
+function renderPhraseText(text) {
+  const tokens = String(text).match(PHRASE_TOKEN_PATTERN) ?? [String(text)];
 
   return tokens
     .map((token) => {
-      if (/^\s+$/u.test(token)) {
-        return token;
+      if (/^\s+$/u.test(token) || WORD_TOKEN_PATTERN.test(token)) {
+        return escapeHtml(token);
       }
 
-      if (WORD_TOKEN_PATTERN.test(token)) {
-        const toneIndex = wordIndex % 3;
-        wordIndex += 1;
-        return `<span class="word-token word-tone-${toneIndex} is-${tone}">${escapeHtml(token)}</span>`;
-      }
-
-      return `<span class="word-punctuation">${escapeHtml(token)}</span>`;
+      return `<span class="phrase-punctuation">${escapeHtml(token)}</span>`;
     })
     .join("");
+}
+
+function buildPhraseLineHtml(phrases, variant) {
+  const toneClasses = ["phrase-tone-0", "phrase-tone-1", "phrase-tone-2"];
+  const lineClass = variant === "assist" ? "assist-line" : "card-line";
+  const variantClass = variant === "syllables" ? "is-syllables-only" : "";
+
+  return `
+    <div class="${lineClass} phrase-line ${variantClass} phrase-line-${variant}">
+      ${phrases
+        .map(
+          (phrase, index) => `
+            <span class="phrase-block ${toneClasses[index % toneClasses.length]}">
+              ${renderPhraseText(phrase)}
+            </span>
+          `
+        )
+        .join("")}
+    </div>
+  `;
 }
 
 function formatAverage(value) {
@@ -858,18 +1074,21 @@ function describeRecency(timestamp) {
 }
 
 function buildRussianCardHtml(chunk) {
+  const phrases = chunk.phrases || [chunk.russian];
+  const syllablePhrases = chunk.syllablePhrases || [chunk.syllabified];
+
   if (state.settings.viewMode === "syllables") {
-    return `<p class="card-line is-syllables-only">${buildWordStyledText(chunk.syllabified, "syllables")}</p>`;
+    return buildPhraseLineHtml(syllablePhrases, "syllables");
   }
 
   if (state.settings.viewMode === "both") {
     return `
-      <p class="card-line">${buildWordStyledText(chunk.russian, "normal")}</p>
-      <p class="assist-line">${buildWordStyledText(chunk.syllabified, "assist")}</p>
+      ${buildPhraseLineHtml(phrases, "normal")}
+      ${buildPhraseLineHtml(syllablePhrases, "assist")}
     `;
   }
 
-  return `<p class="card-line">${buildWordStyledText(chunk.russian, "normal")}</p>`;
+  return buildPhraseLineHtml(phrases, "normal");
 }
 
 function getChunkHeading(chunk) {

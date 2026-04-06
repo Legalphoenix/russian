@@ -37,6 +37,36 @@ body {
   padding: max(16px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
 }
 
+.page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px;
+}
+
+.page-nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.72rem 1rem;
+  border-radius: 999px;
+  background: rgba(31, 26, 23, 0.05);
+  color: var(--muted);
+  text-decoration: none;
+  transition: transform 160ms ease, background 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.page-nav-link:hover {
+  transform: translateY(-1px);
+}
+
+.page-nav-link.is-current {
+  background: var(--ink);
+  color: #fffaf4;
+  box-shadow: 0 12px 24px rgba(31, 26, 23, 0.14);
+}
+
 button,
 select {
   font: inherit;
@@ -120,7 +150,12 @@ select {
 
 .hero {
   display: grid;
-  gap: 20px;
+  gap: 18px;
+}
+
+.hero-copy {
+  display: grid;
+  gap: 0.35rem;
 }
 
 .hero h1,
@@ -134,6 +169,7 @@ select {
 
 .hero h1 {
   font-size: clamp(2.4rem, 8vw, 4.8rem);
+  max-width: 11ch;
 }
 
 .hero h1 span {
@@ -155,19 +191,25 @@ select {
   color: var(--muted);
 }
 
+.lede {
+  margin: 1rem 0 0;
+  max-width: 36ch;
+  font-size: 0.98rem;
+}
+
 .hero-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 1rem;
+  gap: 8px;
+  margin-top: 0.8rem;
 }
 
 .ghost-link {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 42px;
-  padding: 0.75rem 1rem;
+  min-height: 40px;
+  padding: 0.68rem 0.92rem;
   border-radius: 999px;
   border: 1px solid rgba(45, 39, 30, 0.1);
   background: rgba(255, 252, 245, 0.7);
@@ -177,14 +219,16 @@ select {
 
 .hero-metrics {
   display: grid;
-  gap: 12px;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
 }
 
 .metric-card {
   background: var(--panel-strong);
   border: 1px solid rgba(45, 39, 30, 0.08);
   border-radius: var(--radius-md);
-  padding: 14px 16px;
+  padding: 12px 14px;
   display: grid;
   gap: 0.3rem;
 }
@@ -195,7 +239,7 @@ select {
 }
 
 .metric-card strong {
-  font-size: 1.5rem;
+  font-size: 1.25rem;
 }
 
 .metric-footer {
@@ -206,11 +250,16 @@ select {
   background: rgba(31, 102, 93, 0.09);
   color: var(--forest);
   border-radius: var(--radius-md);
-  padding: 0.85rem 1rem;
+  padding: 0.75rem 0.9rem;
+  grid-column: 1 / -1;
 }
 
 .metric-footer strong {
   font-size: 1.1rem;
+}
+
+.hero-metrics > .ghost-button {
+  grid-column: 1 / -1;
 }
 
 .ghost-button,
@@ -658,6 +707,48 @@ select {
 }
 
 @media (max-width: 719px) {
+  .plurals-page .app-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .page-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .page-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .page-nav-link {
+    flex: 0 0 auto;
+    min-height: 38px;
+    padding: 0.58rem 0.82rem;
+    font-size: 0.84rem;
+  }
+
+  .practice-panel {
+    order: 1;
+  }
+
+  .hero {
+    order: 2;
+  }
+
+  .reference-grid {
+    order: 3;
+  }
+
+  .settings-panel {
+    order: 4;
+  }
+
   .panel-heading,
   .hint-row,
   .action-row,
@@ -672,6 +763,62 @@ select {
 
   .hero h1 {
     max-width: none;
+    font-size: clamp(2.05rem, 10vw, 3rem);
+  }
+
+  .hero {
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .hero-copy {
+    gap: 0.25rem;
+  }
+
+  .hero h1 span {
+    font-size: 0.54em;
+  }
+
+  .lede {
+    max-width: 34ch;
+    font-size: 0.92rem;
+  }
+
+  .hero-links {
+    margin-top: 0.5rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+    max-width: 100%;
+  }
+
+  .hero-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .ghost-link {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 0.56rem 0.78rem;
+    font-size: 0.88rem;
+  }
+
+  .hero-metrics {
+    gap: 6px;
+  }
+
+  .metric-card {
+    padding: 0.62rem 0.72rem;
+  }
+
+  .metric-card strong {
+    font-size: 0.98rem;
+  }
+
+  .metric-footer {
+    padding: 0.62rem 0.72rem;
   }
 
   .prompt-card,
