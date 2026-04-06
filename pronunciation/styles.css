@@ -445,7 +445,7 @@ h3 {
 .english-line {
   max-width: var(--measure);
   font-size: clamp(2.05rem, 8.9vw, 2.6rem);
-  line-height: 1.04;
+  line-height: 1.08;
   letter-spacing: -0.04em;
   overflow-wrap: break-word;
   word-break: normal;
@@ -455,10 +455,64 @@ h3 {
 .card-line {
   font-weight: 800;
   color: var(--ink);
+  word-spacing: 0.04em;
 }
 
 .card-line.is-syllables-only {
   color: var(--teal);
+}
+
+.word-token {
+  display: inline;
+  padding: 0.02em 0.08em 0.08em;
+  border-radius: 0.2em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease;
+}
+
+.word-tone-0 {
+  color: #231d18;
+  background: rgba(47, 39, 30, 0.05);
+}
+
+.word-tone-1 {
+  color: #8b4d31;
+  background: rgba(189, 106, 59, 0.12);
+}
+
+.word-tone-2 {
+  color: #1d6667;
+  background: rgba(23, 106, 103, 0.11);
+}
+
+.word-token.is-assist,
+.word-token.is-syllables {
+  font-weight: 700;
+}
+
+.word-token.is-assist.word-tone-0,
+.word-token.is-syllables.word-tone-0 {
+  color: #355b5a;
+  background: rgba(47, 39, 30, 0.04);
+}
+
+.word-token.is-assist.word-tone-1,
+.word-token.is-syllables.word-tone-1 {
+  color: #946146;
+  background: rgba(189, 106, 59, 0.1);
+}
+
+.word-token.is-assist.word-tone-2,
+.word-token.is-syllables.word-tone-2 {
+  color: #176a67;
+  background: rgba(23, 106, 103, 0.1);
+}
+
+.word-punctuation {
+  color: rgba(47, 39, 30, 0.72);
 }
 
 .assist-line {
@@ -466,7 +520,7 @@ h3 {
   padding-top: 8px;
   border-top: 1px solid rgba(47, 39, 30, 0.08);
   font-size: 1.01rem;
-  line-height: 1.4;
+  line-height: 1.52;
   color: var(--teal);
   overflow-wrap: break-word;
   word-break: normal;

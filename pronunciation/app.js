@@ -803,6 +803,30 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+const TEXT_TOKEN_PATTERN = /[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*|\s+|[^\s\p{L}\p{N}]/gu;
+const WORD_TOKEN_PATTERN = /^[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*$/u;
+
+function buildWordStyledText(text, tone = "normal") {
+  const tokens = String(text).match(TEXT_TOKEN_PATTERN) ?? [String(text)];
+  let wordIndex = 0;
+
+  return tokens
+    .map((token) => {
+      if (/^\s+$/u.test(token)) {
+        return token;
+      }
+
+      if (WORD_TOKEN_PATTERN.test(token)) {
+        const toneIndex = wordIndex % 3;
+        wordIndex += 1;
+        return `<span class="word-token word-tone-${toneIndex} is-${tone}">${escapeHtml(token)}</span>`;
+      }
+
+      return `<span class="word-punctuation">${escapeHtml(token)}</span>`;
+    })
+    .join("");
+}
+
 function formatAverage(value) {
   return value ? `${value.toFixed(1)} / 5` : "--";
 }
@@ -835,17 +859,17 @@ function describeRecency(timestamp) {
 
 function buildRussianCardHtml(chunk) {
   if (state.settings.viewMode === "syllables") {
-    return `<p class="card-line is-syllables-only">${escapeHtml(chunk.syllabified)}</p>`;
+    return `<p class="card-line is-syllables-only">${buildWordStyledText(chunk.syllabified, "syllables")}</p>`;
   }
 
   if (state.settings.viewMode === "both") {
     return `
-      <p class="card-line">${escapeHtml(chunk.russian)}</p>
-      <p class="assist-line">${escapeHtml(chunk.syllabified)}</p>
+      <p class="card-line">${buildWordStyledText(chunk.russian, "normal")}</p>
+      <p class="assist-line">${buildWordStyledText(chunk.syllabified, "assist")}</p>
     `;
   }
 
-  return `<p class="card-line">${escapeHtml(chunk.russian)}</p>`;
+  return `<p class="card-line">${buildWordStyledText(chunk.russian, "normal")}</p>`;
 }
 
 function getChunkHeading(chunk) {
