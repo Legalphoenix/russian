@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="HVPT Russian ear training with OpenAI multi-voice phrase generation and a saved phrase library."
+    />
+    <title>HVPT Voice Lab</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true">
+      <div class="wash wash-a"></div>
+      <div class="wash wash-b"></div>
+      <div class="grid-noise"></div>
+    </div>
+
+    <main class="app-shell">
+      <nav class="page-nav panel" aria-label="Trainer pages">
+        <a class="page-nav-link" href="../index.html">был / буду Drill</a>
+        <a class="page-nav-link" href="../possessives.html">Possessives Matrix</a>
+        <a class="page-nav-link" href="../colours/index.html">Colour Studio</a>
+        <a class="page-nav-link" href="../sentences/index.html">Sentence Coach</a>
+        <a class="page-nav-link" href="../pronunciation/">Pronunciation Coach</a>
+        <a class="page-nav-link is-current" href="./index.html">HVPT Voice Lab</a>
+      </nav>
+
+      <header class="hero panel reveal">
+        <div class="hero-copy">
+          <p class="eyebrow">High-Variability Phonetic Training</p>
+          <h1>One phrase. Many voices. Fast ear work.</h1>
+          <p class="lede">
+            Build a compact listening bank for the exact Russian lines you are studying. Generate the same phrase
+            across multiple OpenAI voices, steer the delivery, and save the phrase to return to later.
+          </p>
+        </div>
+
+        <div class="hero-stack">
+          <div class="hero-card">
+            <span class="hero-label">Focus</span>
+            <strong>Perception first</strong>
+            <p>Use voice variation, pace shifts, and quick repeats before you worry about speaking.</p>
+          </div>
+          <div class="hero-card">
+            <span class="hero-label">Disclosure</span>
+            <strong>AI-generated audio</strong>
+            <p>These clips come from OpenAI text-to-speech, not recorded human speakers.</p>
+          </div>
+        </div>
+      </header>
+
+      <section class="composer panel reveal">
+        <div class="panel-head">
+          <div>
+            <p class="section-kicker">Compose the drill</p>
+            <h2>Phrase builder</h2>
+          </div>
+          <span id="active-phrase-pill" class="status-pill">Unsaved draft</span>
+        </div>
+
+        <div id="notice" class="notice" aria-live="polite"></div>
+
+        <label class="field">
+          <span class="field-label">Russian phrase</span>
+          <textarea
+            id="phrase-input"
+            class="text-area"
+            rows="3"
+            placeholder="Мне нужно купить билет."
+            spellcheck="false"
+            autocapitalize="off"
+            autocomplete="off"
+            autocorrect="off"
+          ></textarea>
+        </label>
+
+        <label class="field">
+          <span class="field-label">English / note</span>
+          <input id="note-input" class="text-input" type="text" placeholder="I need to buy a ticket." />
+        </label>
+
+        <div class="tuning-grid">
+          <section class="subpanel">
+            <div class="subpanel-head">
+              <div>
+                <p class="section-kicker">Voice steering</p>
+                <h3>Instructions</h3>
+              </div>
+              <span class="subpanel-note">Optional, but useful for slow / fast / clipped / calm passes.</span>
+            </div>
+
+            <div id="preset-row" class="preset-row" aria-label="Instruction presets"></div>
+
+            <label class="field compact-field">
+              <span class="field-label">Direction for the voice</span>
+              <textarea
+                id="instructions-input"
+                class="text-area short-area"
+                rows="5"
+                placeholder="Tone: Calm and clear.&#10;Pacing: Slow and deliberate.&#10;Pronunciation: Crisp consonants and clear stress."
+              ></textarea>
+            </label>
+          </section>
+
+          <section class="subpanel">
+            <div class="subpanel-head">
+              <div>
+                <p class="section-kicker">Timing</p>
+                <h3>Speed</h3>
+              </div>
+              <strong id="speed-value" class="speed-value">1.00x</strong>
+            </div>
+
+            <label class="slider-wrap" for="speed-input">
+              <input id="speed-input" class="speed-slider" type="range" min="0.25" max="1.8" step="0.05" value="1" />
+            </label>
+
+            <p class="subpanel-note">Model speed is separate from browser playback speed. Use both when you want contrast.</p>
+          </section>
+        </div>
+
+        <section class="subpanel voice-panel">
+          <div class="subpanel-head">
+            <div>
+              <p class="section-kicker">Voice pack</p>
+              <h3>Choose the set</h3>
+            </div>
+            <div class="voice-toolbar">
+              <span id="voice-count" class="voice-count">0 voices selected</span>
+              <div class="inline-actions">
+                <button id="recommended-voices-button" class="mini-button" type="button">Recommended</button>
+                <button id="all-voices-button" class="mini-button" type="button">All</button>
+                <button id="clear-voices-button" class="mini-button" type="button">Clear</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="voice-grid" class="voice-grid"></div>
+        </section>
+
+        <div class="action-row">
+          <button id="generate-button" class="primary-button" type="button">Generate voice pack</button>
+          <button id="save-button" class="ghost-button" type="button">Save phrase</button>
+          <button id="new-button" class="ghost-button" type="button">New phrase</button>
+        </div>
+      </section>
+
+      <section class="pack panel reveal">
+        <div class="panel-head">
+          <div>
+            <p class="section-kicker">Practice pack</p>
+            <h2>Generated passes</h2>
+          </div>
+          <span id="pack-summary" class="section-note">Generate a pack to start listening.</span>
+        </div>
+
+        <div class="pack-tools">
+          <button id="cycle-button" class="ghost-button" type="button">Cycle voices</button>
+          <button id="shuffle-button" class="ghost-button" type="button">Shuffle cycle</button>
+          <button id="stop-button" class="ghost-button" type="button">Stop</button>
+        </div>
+
+        <div id="variant-list" class="variant-list"></div>
+      </section>
+
+      <section class="library panel reveal">
+        <div class="panel-head">
+          <div>
+            <p class="section-kicker">Saved bank</p>
+            <h2>Practice later</h2>
+          </div>
+          <span id="library-count" class="section-note">0 saved phrases</span>
+        </div>
+
+        <div id="library-list" class="library-list"></div>
+      </section>
+
+      <section class="hvpt-note panel reveal">
+        <div class="panel-head">
+          <div>
+            <p class="section-kicker">Why this works</p>
+            <h2>HVPT in plain language</h2>
+          </div>
+        </div>
+
+        <div class="hvpt-grid">
+          <article class="hvpt-card">
+            <span class="step-index">1</span>
+            <h3>Hold the phrase steady</h3>
+            <p>Keep the words the same so your ear locks onto stress, rhythm, and reduction instead of new vocabulary.</p>
+          </article>
+          <article class="hvpt-card">
+            <span class="step-index">2</span>
+            <h3>Change the voice</h3>
+            <p>Switch speaker color, pace, and delivery. That is the variability your brain needs.</p>
+          </article>
+          <article class="hvpt-card">
+            <span class="step-index">3</span>
+            <h3>Come back to hard lines</h3>
+            <p>Save the phrases that still feel slippery, then cycle them again tomorrow instead of starting from scratch.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

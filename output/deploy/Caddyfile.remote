@@ -65,7 +65,16 @@ russian.159.223.236.244.sslip.io {
 		reverse_proxy 127.0.0.1:8791
 	}
 
+	handle_path /hvpt/api/* {
+		reverse_proxy 127.0.0.1:8792
+	}
+
 	handle /pronunciation* {
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle /hvpt* {
 		root * /srv/russian.159.223.236.244.sslip.io
 		file_server
 	}
@@ -122,6 +131,10 @@ russian-hub.159.223.236.244.sslip.io index.macchiatolabs.ai {
 		reverse_proxy 127.0.0.1:8791
 	}
 
+	handle_path /index/hvpt/api/* {
+		reverse_proxy 127.0.0.1:8792
+	}
+
 	handle /index/sentences* {
 		uri strip_prefix /index
 		root * /srv/russian.159.223.236.244.sslip.io
@@ -129,6 +142,12 @@ russian-hub.159.223.236.244.sslip.io index.macchiatolabs.ai {
 	}
 
 	handle /index/pronunciation* {
+		uri strip_prefix /index
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle /index/hvpt* {
 		uri strip_prefix /index
 		root * /srv/russian.159.223.236.244.sslip.io
 		file_server
@@ -207,6 +226,10 @@ macchiatolabs.ai {
 		reverse_proxy 127.0.0.1:8787
 	}
 
+	handle_path /index/hvpt/api/* {
+		reverse_proxy 127.0.0.1:8792
+	}
+
 	handle /index/sentences* {
 		uri strip_prefix /index
 		root * /srv/russian.159.223.236.244.sslip.io
@@ -214,6 +237,12 @@ macchiatolabs.ai {
 	}
 
 	handle /index/pronunciation* {
+		uri strip_prefix /index
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle /index/hvpt* {
 		uri strip_prefix /index
 		root * /srv/russian.159.223.236.244.sslip.io
 		file_server

@@ -1,0 +1,30 @@
+[Unit]
+Description=Russian HVPT Voice Lab sync service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/srv/russian.159.223.236.244.sslip.io
+StateDirectory=russian-hvpt-coach
+EnvironmentFile=-/etc/default/russian-hvpt-coach
+Environment=OPENAI_TTS_MODEL=gpt-4o-mini-tts-2025-12-15
+ExecStart=/usr/bin/python3 /srv/russian.159.223.236.244.sslip.io/backend/hvpt_sync.py serve --host 127.0.0.1 --port 8792 --data-dir /var/lib/russian-hvpt-coach --static-root /srv/russian.159.223.236.244.sslip.io
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectControlGroups=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
