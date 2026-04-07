@@ -1,0 +1,4 @@
+interface:
+  display_name: "Russian Drill Workflow"
+  short_description: "Build Russian drills with mobile-first readability"
+  default_prompt: "Use $russian-drill-workflow to work on the Russian drills repo with drill-first hierarchy, phone readability, real visual checks, and droplet-first deployment."

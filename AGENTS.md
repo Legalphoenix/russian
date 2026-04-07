@@ -16,6 +16,11 @@ These Russian pages/apps are being built around the user's real Russian study wi
 - Prefer concrete, narrow drills over broad generic language-learning features.
 - If a new Russian app/page is built and meant to be usable, add it to the launcher at `launcher/index.html` as well.
 
+## Project Skill
+
+- For drill UI, mobile readability, launcher integration, visual QA, or deployment work in this repo, consult `.codex/skills/russian-drill-workflow/SKILL.md`.
+- Use that skill to orient future sub-agents so they preserve the drill-first product shape, phone readability, and the droplet-first deployment flow.
+
 ## Droplet Context
 
 - Droplet SSH: `ssh root@wordai.macchiatolabs.ai`
