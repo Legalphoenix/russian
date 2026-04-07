@@ -23,6 +23,10 @@ HISTORY_LIMIT = 240
 VIEW_MODES = ("normal", "syllables", "both")
 VIEW_MODE_SET = frozenset(VIEW_MODES)
 CHUNK_IDS = (
+    "s0-c1",
+    "s0-c2",
+    "s0-c3",
+    "s0-c4",
     "s1-c1",
     "s1-c2",
     "s1-c3",
