@@ -32,7 +32,9 @@ const state = {
   defaultVoices: [],
   phrases: [],
   variants: [],
-  currentPhraseId: "",
+  loadedPhraseId: "",
+  loadedPhraseSnapshot: null,
+  formDirty: false,
   playingVariantId: "",
   cycleToken: 0,
   isGenerating: false,
@@ -53,6 +55,7 @@ const refs = {
   activePhrasePill: document.getElementById("active-phrase-pill"),
   generateButton: document.getElementById("generate-button"),
   saveButton: document.getElementById("save-button"),
+  updateButton: document.getElementById("update-button"),
   newButton: document.getElementById("new-button"),
   recommendedVoicesButton: document.getElementById("recommended-voices-button"),
   allVoicesButton: document.getElementById("all-voices-button"),
@@ -97,6 +100,37 @@ function shuffle(items) {
   return clone;
 }
 
+function normalizeDraft(candidate) {
+  return {
+    text: String(candidate?.text || "").trim(),
+    note: String(candidate?.note || "").trim(),
+    instructions: String(candidate?.instructions || "").trim(),
+    speed: Number(candidate?.speed ?? 1),
+    voices: Array.isArray(candidate?.voices) ? [...candidate.voices] : [],
+  };
+}
+
+function getCurrentDraft() {
+  return normalizeDraft({
+    text: refs.phraseInput.value,
+    note: refs.noteInput.value,
+    instructions: refs.instructionsInput.value,
+    speed: refs.speedInput.value,
+    voices: currentVoiceSelection(),
+  });
+}
+
+function draftsMatch(left, right) {
+  return (
+    left.text === right.text &&
+    left.note === right.note &&
+    left.instructions === right.instructions &&
+    left.speed === right.speed &&
+    left.voices.length === right.voices.length &&
+    left.voices.every((voice, index) => voice === right.voices[index])
+  );
+}
+
 function currentVoiceSelection() {
   return Array.from(refs.voiceGrid.querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value);
 }
@@ -132,36 +166,63 @@ function renderVoiceGrid() {
 
 function syncComposerMeta() {
   const selectedVoices = currentVoiceSelection();
+  const hasLoadedPhrase = Boolean(state.loadedPhraseId);
   refs.voiceCount.textContent = `${selectedVoices.length} voice${selectedVoices.length === 1 ? "" : "s"} selected`;
   refs.speedValue.textContent = formatSpeed(refs.speedInput.value);
-  refs.activePhrasePill.textContent = state.currentPhraseId ? "Saved phrase" : "Unsaved draft";
-  refs.saveButton.textContent = state.currentPhraseId ? "Update phrase" : "Save phrase";
+  refs.activePhrasePill.textContent = state.formDirty
+    ? "Modified draft"
+    : hasLoadedPhrase
+      ? "Saved phrase"
+      : "Unsaved draft";
+  refs.saveButton.textContent = hasLoadedPhrase ? "Save as new phrase" : "Save phrase";
+  refs.updateButton.hidden = !hasLoadedPhrase;
 
   const variantReady = state.variants.length > 0;
   refs.generateButton.disabled = !state.ttsReady || state.isGenerating;
   refs.saveButton.disabled = state.isSaving;
+  refs.updateButton.disabled = !hasLoadedPhrase || !state.formDirty || state.isSaving;
   refs.cycleButton.disabled = !variantReady || state.isGenerating;
   refs.shuffleButton.disabled = !variantReady || state.isGenerating;
   refs.stopButton.disabled = !variantReady;
 }
 
 function collectPhrasePayload() {
-  const text = refs.phraseInput.value.trim();
-  const voices = currentVoiceSelection();
-  if (!text) {
+  const payload = getCurrentDraft();
+  if (!payload.text) {
     throw new Error("Enter a Russian phrase first.");
   }
-  if (!voices.length) {
+  if (!payload.voices.length) {
     throw new Error("Select at least one voice.");
   }
+  return payload;
+}
 
-  return {
-    text,
-    note: refs.noteInput.value.trim(),
-    instructions: refs.instructionsInput.value.trim(),
-    speed: Number(refs.speedInput.value),
-    voices,
-  };
+function syncDraftState({ announce = false } = {}) {
+  const previousDirty = state.formDirty;
+  state.formDirty = Boolean(
+    state.loadedPhraseId &&
+      state.loadedPhraseSnapshot &&
+      !draftsMatch(getCurrentDraft(), state.loadedPhraseSnapshot)
+  );
+
+  if (announce && state.loadedPhraseId && !previousDirty && state.formDirty) {
+    setNotice("info", "Loaded phrase changed. Save as new phrase to keep both, or update loaded phrase to overwrite.");
+  }
+
+  syncComposerMeta();
+}
+
+function setLoadedPhrase(phrase) {
+  if (!phrase) {
+    state.loadedPhraseId = "";
+    state.loadedPhraseSnapshot = null;
+    state.formDirty = false;
+    return;
+  }
+
+  state.loadedPhraseId = phrase.id || "";
+  state.loadedPhraseSnapshot = normalizeDraft(phrase);
+  state.formDirty = false;
 }
 
 async function fetchJson(url, options = {}) {
@@ -233,7 +294,7 @@ function renderLibrary() {
 
   refs.libraryList.innerHTML = state.phrases
     .map((phrase) => {
-      const isActive = phrase.id === state.currentPhraseId;
+      const isActive = phrase.id === state.loadedPhraseId;
       const note = phrase.note ? `<p class="library-note">${phrase.note}</p>` : "";
       const instructionNote = phrase.instructions ? "voice direction saved" : "plain delivery";
       return `
@@ -261,8 +322,8 @@ function populateComposer(phrase) {
   refs.noteInput.value = phrase.note || "";
   refs.instructionsInput.value = phrase.instructions || "";
   refs.speedInput.value = phrase.speed || 1;
+  setLoadedPhrase(phrase);
   setVoiceSelection(phrase.voices || state.defaultVoices);
-  state.currentPhraseId = phrase.id || "";
   state.variants = [];
   state.playingVariantId = "";
   renderVariants();
@@ -276,7 +337,7 @@ function clearComposer() {
   refs.noteInput.value = "";
   refs.instructionsInput.value = "";
   refs.speedInput.value = "1";
-  state.currentPhraseId = "";
+  setLoadedPhrase(null);
   state.variants = [];
   state.playingVariantId = "";
   setVoiceSelection(state.defaultVoices);
@@ -430,7 +491,7 @@ async function generateCurrentPhrase({ silent = false } = {}) {
   }
 }
 
-async function saveCurrentPhrase() {
+async function saveCurrentPhrase({ mode = "new" } = {}) {
   let payload;
   try {
     payload = collectPhrasePayload();
@@ -441,21 +502,40 @@ async function saveCurrentPhrase() {
 
   state.isSaving = true;
   syncComposerMeta();
-  setNotice("info", state.currentPhraseId ? "Updating saved phrase..." : "Saving phrase...");
+  let method = "POST";
+  let url = `${API_BASE}/phrases`;
+  let progressMessage = "Saving phrase...";
+  let successMessage = "Phrase saved.";
+
+  if (mode === "update") {
+    if (!state.loadedPhraseId) {
+      state.isSaving = false;
+      syncComposerMeta();
+      setNotice("warning", "Load a saved phrase first.");
+      return;
+    }
+    method = "PUT";
+    url = `${API_BASE}/phrases/${state.loadedPhraseId}`;
+    progressMessage = "Updating loaded phrase...";
+    successMessage = "Loaded phrase updated.";
+  } else if (state.loadedPhraseId) {
+    progressMessage = "Saving new phrase...";
+    successMessage = "Saved as new phrase.";
+  }
+
+  setNotice("info", progressMessage);
 
   try {
-    const method = state.currentPhraseId ? "PUT" : "POST";
-    const url = state.currentPhraseId ? `${API_BASE}/phrases/${state.currentPhraseId}` : `${API_BASE}/phrases`;
     const response = await fetchJson(url, {
       method,
       body: JSON.stringify(payload),
     });
     const savedPhrase = response.phrase;
-    state.currentPhraseId = savedPhrase.id;
+    setLoadedPhrase(savedPhrase);
     upsertPhrase(savedPhrase);
     renderLibrary();
     syncComposerMeta();
-    setNotice("success", "Phrase saved.");
+    setNotice("success", successMessage);
   } catch (error) {
     setNotice("error", error.message);
   } finally {
@@ -476,7 +556,7 @@ async function deletePhrase(phraseId) {
   try {
     await fetchJson(`${API_BASE}/phrases/${phraseId}`, { method: "DELETE" });
     state.phrases = state.phrases.filter((item) => item.id !== phraseId);
-    if (state.currentPhraseId === phraseId) {
+    if (state.loadedPhraseId === phraseId) {
       clearComposer();
     } else {
       renderLibrary();
@@ -519,16 +599,30 @@ function bindEvents() {
     refs.presetRow.querySelectorAll("[data-preset]").forEach((candidate) => {
       candidate.classList.toggle("is-active", candidate === button);
     });
-    syncComposerMeta();
+    syncDraftState({ announce: true });
   });
 
-  refs.speedInput.addEventListener("input", syncComposerMeta);
-  refs.voiceGrid.addEventListener("change", syncComposerMeta);
+  [refs.phraseInput, refs.noteInput, refs.instructionsInput].forEach((input) => {
+    input.addEventListener("input", () => {
+      syncDraftState({ announce: true });
+    });
+  });
+  refs.speedInput.addEventListener("input", () => {
+    syncDraftState({ announce: true });
+  });
+  refs.voiceGrid.addEventListener("change", () => {
+    syncDraftState({ announce: true });
+  });
 
   refs.generateButton.addEventListener("click", () => {
     generateCurrentPhrase();
   });
-  refs.saveButton.addEventListener("click", saveCurrentPhrase);
+  refs.saveButton.addEventListener("click", () => {
+    saveCurrentPhrase({ mode: "new" });
+  });
+  refs.updateButton.addEventListener("click", () => {
+    saveCurrentPhrase({ mode: "update" });
+  });
   refs.newButton.addEventListener("click", () => {
     clearComposer();
     setNotice("info", "Fresh draft ready.");
