@@ -44,6 +44,10 @@ const state = {
   isRecording: false,
   mediaRecorder: null,
   mediaStream: null,
+  drillActive: false,
+  drillToken: 0,
+  drillSelectedIds: new Set(),
+  drillPlayingPhraseId: "",
 };
 
 const refs = {
@@ -72,6 +76,12 @@ const refs = {
   libraryCount: document.getElementById("library-count"),
   libraryList: document.getElementById("library-list"),
   recordButton: document.getElementById("record-button"),
+  drillStartButton: document.getElementById("drill-start-button"),
+  drillStopButton: document.getElementById("drill-stop-button"),
+  drillSelectAllButton: document.getElementById("drill-select-all-button"),
+  drillClearButton: document.getElementById("drill-clear-button"),
+  drillStatus: document.getElementById("drill-status"),
+  drillAudio: document.getElementById("drill-audio"),
 };
 
 function setNotice(kind, message) {
@@ -257,6 +267,7 @@ function upsertPhrase(phrase) {
     state.phrases.splice(existingIndex, 1, phrase);
   } else {
     state.phrases.push(phrase);
+    state.drillSelectedIds.add(phrase.id);
   }
   state.phrases.sort((left, right) => right.updatedAt - left.updatedAt);
 }
@@ -324,18 +335,24 @@ function renderLibrary() {
 
   if (!state.phrases.length) {
     refs.libraryList.innerHTML = `<div class="empty-state">Save the phrases that still need ear work. They will stay on the server-backed phrase bank for later practice.</div>`;
+    syncDrillUI();
     return;
   }
 
   refs.libraryList.innerHTML = state.phrases
     .map((phrase) => {
       const isActive = phrase.id === state.loadedPhraseId;
+      const isDrillSelected = state.drillSelectedIds.has(phrase.id);
+      const isDrillPlaying = state.drillPlayingPhraseId === phrase.id;
       const note = phrase.note ? `<p class="library-note">${phrase.note}</p>` : "";
       const instructionNote = phrase.instructions ? "voice direction saved" : "plain delivery";
       return `
-        <article class="library-card ${isActive ? "is-active" : ""}" data-phrase-id="${phrase.id}">
+        <article class="library-card ${isActive ? "is-active" : ""} ${!isDrillSelected ? "is-drill-excluded" : ""} ${isDrillPlaying ? "is-drill-playing" : ""}" data-phrase-id="${phrase.id}">
           <div class="library-top">
-            <span class="library-tag">${phrase.voices.length} voices</span>
+            <div class="library-top-left">
+              <input type="checkbox" class="drill-check" data-phrase-id="${phrase.id}" ${isDrillSelected ? "checked" : ""} />
+              <span class="library-tag">${phrase.voices.length} voices</span>
+            </div>
             <span class="library-date">${formatDate(phrase.updatedAt)}</span>
           </div>
           <p class="library-text">${phrase.text}</p>
@@ -350,6 +367,7 @@ function renderLibrary() {
       `;
     })
     .join("");
+  syncDrillUI();
 }
 
 function populateComposer(phrase) {
@@ -478,6 +496,7 @@ async function cycleVariants({ random = false } = {}) {
     return;
   }
 
+  if (state.drillActive) stopDrill();
   stopCycle();
   const token = state.cycleToken;
   let items = [...state.variants];
@@ -609,6 +628,7 @@ async function deletePhrase(phraseId) {
   try {
     await fetchJson(`${API_BASE}/phrases/${phraseId}`, { method: "DELETE" });
     state.phrases = state.phrases.filter((item) => item.id !== phraseId);
+    state.drillSelectedIds.delete(phraseId);
     if (state.loadedPhraseId === phraseId) {
       clearComposer();
     } else {
@@ -746,6 +766,126 @@ function stopRecording() {
   }
 }
 
+function syncDrillUI() {
+  const selectedCount = state.drillSelectedIds.size;
+  const totalCount = state.phrases.length;
+  refs.drillStartButton.disabled = selectedCount === 0 || state.drillActive;
+  refs.drillStopButton.hidden = !state.drillActive;
+  refs.drillStartButton.hidden = state.drillActive;
+  refs.drillSelectAllButton.disabled = state.drillActive;
+  refs.drillClearButton.disabled = state.drillActive;
+  if (totalCount === 0) {
+    refs.drillStartButton.disabled = true;
+  }
+}
+
+function setDrillStatus(message) {
+  if (!message) {
+    refs.drillStatus.classList.remove("is-visible");
+    refs.drillStatus.textContent = "";
+    return;
+  }
+  refs.drillStatus.textContent = message;
+  refs.drillStatus.classList.add("is-visible");
+}
+
+function stopDrill() {
+  state.drillToken += 1;
+  state.drillActive = false;
+  state.drillPlayingPhraseId = "";
+  refs.drillAudio.pause();
+  refs.drillAudio.removeAttribute("src");
+  setDrillStatus("");
+  renderLibrary();
+  syncDrillUI();
+}
+
+async function startDrill() {
+  const selected = state.phrases.filter((p) => state.drillSelectedIds.has(p.id));
+  if (!selected.length) {
+    setNotice("warning", "Select at least one phrase for the drill.");
+    return;
+  }
+
+  stopCycle();
+  state.drillActive = true;
+  state.drillToken += 1;
+  const token = state.drillToken;
+  syncDrillUI();
+  renderLibrary();
+  setDrillStatus(`Drill running: ${selected.length} phrase${selected.length === 1 ? "" : "s"} selected.`);
+
+  try {
+    while (state.drillActive && token === state.drillToken) {
+      const phraseOrder = shuffle(selected);
+      for (const phrase of phraseOrder) {
+        if (token !== state.drillToken) return;
+
+        state.drillPlayingPhraseId = phrase.id;
+        renderLibrary();
+
+        const voicePool = phrase.voices && phrase.voices.length ? phrase.voices : state.defaultVoices;
+        const voice = voicePool[Math.floor(Math.random() * voicePool.length)];
+
+        setDrillStatus(`Playing: "${phrase.text.slice(0, 50)}${phrase.text.length > 50 ? "..." : ""}" — ${voice}`);
+
+        let audioUrl;
+        try {
+          const response = await fetchJson(`${API_BASE}/generate`, {
+            method: "POST",
+            body: JSON.stringify({
+              text: phrase.text,
+              note: phrase.note || "",
+              instructions: phrase.instructions || "",
+              speed: phrase.speed || 1,
+              voices: [voice],
+            }),
+          });
+          if (!response.variants || !response.variants.length) continue;
+          audioUrl = response.variants[0].url;
+        } catch (genError) {
+          setDrillStatus(`Skipping "${phrase.text.slice(0, 30)}..." — generation failed.`);
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+
+        if (token !== state.drillToken) return;
+
+        await new Promise((resolve, reject) => {
+          const audio = refs.drillAudio;
+          const cleanup = () => {
+            audio.removeEventListener("ended", onEnd);
+            audio.removeEventListener("error", onErr);
+          };
+          const onEnd = () => { cleanup(); resolve(); };
+          const onErr = () => { cleanup(); reject(new Error("Playback failed.")); };
+          audio.addEventListener("ended", onEnd, { once: true });
+          audio.addEventListener("error", onErr, { once: true });
+          audio.src = audioUrl;
+          audio.play().catch((e) => { cleanup(); reject(e); });
+        });
+
+        if (token !== state.drillToken) return;
+
+        await new Promise((r) => setTimeout(r, 800));
+      }
+    }
+  } catch (error) {
+    if (token === state.drillToken) {
+      setNotice("error", error.message || "Drill playback error.");
+    }
+  } finally {
+    if (token === state.drillToken) {
+      state.drillActive = false;
+      state.drillPlayingPhraseId = "";
+      setDrillStatus("");
+      renderLibrary();
+      syncDrillUI();
+      setNotice("success", "Drill finished.");
+    }
+  }
+}
+
 function bindEvents() {
   renderPresets();
 
@@ -853,6 +993,34 @@ function bindEvents() {
       deletePhrase(phraseId);
     }
   });
+
+  refs.libraryList.addEventListener("change", (event) => {
+    const checkbox = event.target.closest(".drill-check");
+    if (!checkbox) return;
+    const phraseId = checkbox.dataset.phraseId;
+    if (checkbox.checked) {
+      state.drillSelectedIds.add(phraseId);
+    } else {
+      state.drillSelectedIds.delete(phraseId);
+    }
+    renderLibrary();
+  });
+
+  refs.drillStartButton.addEventListener("click", () => {
+    startDrill();
+  });
+  refs.drillStopButton.addEventListener("click", () => {
+    stopDrill();
+    setNotice("info", "Drill stopped.");
+  });
+  refs.drillSelectAllButton.addEventListener("click", () => {
+    state.phrases.forEach((p) => state.drillSelectedIds.add(p.id));
+    renderLibrary();
+  });
+  refs.drillClearButton.addEventListener("click", () => {
+    state.drillSelectedIds.clear();
+    renderLibrary();
+  });
 }
 
 async function init() {
@@ -870,9 +1038,11 @@ async function init() {
 
     renderVoiceGrid();
     refs.speedInput.value = String(bootstrap.defaultSpeed || 1);
+    state.phrases.forEach((p) => state.drillSelectedIds.add(p.id));
     renderLibrary();
     renderVariants();
     syncComposerMeta();
+    syncDrillUI();
 
     if (state.ttsReady) {
       setNotice("info", "AI-generated audio is ready. Build a phrase, choose your voice pack, and generate.");

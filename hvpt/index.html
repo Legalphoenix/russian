@@ -172,6 +172,17 @@
           <span id="library-count" class="section-note">0 saved phrases</span>
         </div>
 
+        <div class="drill-toolbar">
+          <button id="drill-start-button" class="primary-button" type="button">Start drill</button>
+          <button id="drill-stop-button" class="ghost-button" type="button" hidden>Stop drill</button>
+          <div class="inline-actions">
+            <button id="drill-select-all-button" class="mini-button" type="button">Select all</button>
+            <button id="drill-clear-button" class="mini-button" type="button">Clear</button>
+          </div>
+        </div>
+        <div id="drill-status" class="drill-status"></div>
+        <audio id="drill-audio" preload="auto" style="display:none"></audio>
+
         <div id="library-list" class="library-list"></div>
       </section>
       </div><!-- .sidebar -->
