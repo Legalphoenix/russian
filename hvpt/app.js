@@ -699,7 +699,23 @@ async function startRecording() {
           phraseText: refs.phraseInput.value.trim(),
         };
         renderVariants();
-        setNotice("success", "Recording saved to server.");
+
+        if (state.loadedPhraseId && state.loadedPhraseSnapshot) {
+          try {
+            const savePayload = { ...state.loadedPhraseSnapshot, recordingUrl: result.url };
+            await fetchJson(`${API_BASE}/phrases/${state.loadedPhraseId}`, {
+              method: "PUT",
+              body: JSON.stringify(savePayload),
+            });
+            const localPhrase = state.phrases.find((p) => p.id === state.loadedPhraseId);
+            if (localPhrase) localPhrase.recordingUrl = result.url;
+            setNotice("success", "Recording saved and linked to phrase.");
+          } catch (autoSaveError) {
+            setNotice("success", "Recording saved. Save the phrase to keep it permanently.");
+          }
+        } else {
+          setNotice("success", "Recording saved. Save the phrase to keep it permanently.");
+        }
       } catch (uploadError) {
         state.userRecording = {
           id: "user-recording",
