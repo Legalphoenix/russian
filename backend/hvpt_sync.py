@@ -27,6 +27,7 @@ except ImportError:  # pragma: no cover - environment dependent
     OpenAI = None
 
 MAX_REQUEST_BYTES = 128 * 1024
+MAX_RECORDING_BYTES = 10 * 1024 * 1024
 MAX_TEXT_LENGTH = 4096
 MAX_NOTE_LENGTH = 240
 MAX_INSTRUCTIONS_LENGTH = 1200
@@ -146,6 +147,7 @@ def validate_phrase_payload(payload: Any, *, phrase_id: str | None = None, exist
         raise ValidationError("Speed must be between 0.25 and 4.0.")
 
     voices = validate_voice_list(payload.get("voices") or [])
+    recording_url = normalize_text(payload.get("recordingUrl"))
     now_ms = current_time_ms()
     created_at = existing_created_at if existing_created_at is not None else now_ms
 
@@ -157,6 +159,7 @@ def validate_phrase_payload(payload: Any, *, phrase_id: str | None = None, exist
         "instructions": instructions,
         "speed": speed,
         "voices": voices,
+        "recordingUrl": recording_url,
         "createdAt": created_at,
         "updatedAt": now_ms,
     }
@@ -292,6 +295,23 @@ class PhraseStore:
             "phrase": phrase,
             "variants": variants,
             "generatedAt": current_time_ms(),
+        }
+
+    def save_recording(self, content: bytes, extension: str = ".webm") -> dict[str, Any]:
+        """Save a user recording to the audio directory."""
+        if len(content) > MAX_RECORDING_BYTES:
+            raise ValidationError(f"Recording too large (max {MAX_RECORDING_BYTES // (1024 * 1024)}MB).")
+        if not content:
+            raise ValidationError("Recording is empty.")
+        digest = hashlib.sha256(content).hexdigest()[:24]
+        file_name = f"rec-{digest}{extension}"
+        output_path = self.audio_dir / file_name
+        if not output_path.exists():
+            self._write_audio(output_path, content)
+        return {
+            "fileName": file_name,
+            "url": f"./api/audio/{file_name}",
+            "sizeBytes": output_path.stat().st_size,
         }
 
     def audio_path_for_name(self, file_name: str) -> Path | None:
@@ -468,6 +488,20 @@ class HvptRequestHandler(SimpleHTTPRequestHandler):
                 phrase = self.server.store.save_phrase(payload)
                 self._write_json(HTTPStatus.CREATED, {"phrase": phrase})
                 return
+            if path == "/recording":
+                content = self._read_raw_body(MAX_RECORDING_BYTES)
+                content_type = normalize_text(self.headers.get("Content-Type"))
+                if "ogg" in content_type:
+                    ext = ".ogg"
+                elif "wav" in content_type:
+                    ext = ".wav"
+                elif "mp4" in content_type or "m4a" in content_type:
+                    ext = ".m4a"
+                else:
+                    ext = ".webm"
+                result = self.server.store.save_recording(content, extension=ext)
+                self._write_json(HTTPStatus.CREATED, result)
+                return
         except ValidationError as exc:
             self._write_error(HTTPStatus.BAD_REQUEST, str(exc))
             return
@@ -525,8 +559,16 @@ class HvptRequestHandler(SimpleHTTPRequestHandler):
             return
 
         content = path.read_bytes()
+        if file_name.endswith(".webm"):
+            content_type = "audio/webm"
+        elif file_name.endswith(".ogg"):
+            content_type = "audio/ogg"
+        elif file_name.endswith(".wav"):
+            content_type = "audio/wav"
+        else:
+            content_type = "audio/mpeg"
         self.send_response(HTTPStatus.OK.value)
-        self.send_header("Content-Type", "audio/mpeg")
+        self.send_header("Content-Type", content_type)
         self.send_header("Cache-Control", "public, max-age=31536000, immutable")
         self.send_header("Content-Length", str(len(content)))
         self.end_headers()
@@ -557,6 +599,20 @@ class HvptRequestHandler(SimpleHTTPRequestHandler):
 
         body = self.rfile.read(content_length)
         return json.loads(body.decode("utf-8"))
+
+    def _read_raw_body(self, max_bytes: int) -> bytes:
+        header = self.headers.get("Content-Length")
+        if header is None:
+            raise ValidationError("Content-Length header is required.")
+        try:
+            content_length = int(header, 10)
+        except ValueError as exc:
+            raise ValidationError("Content-Length header must be a non-negative integer.") from exc
+        if content_length < 0:
+            raise ValidationError("Content-Length header must be a non-negative integer.")
+        if content_length > max_bytes:
+            raise ValidationError("Request body is too large.")
+        return self.rfile.read(content_length)
 
     def _write_json(self, status: HTTPStatus, payload: Any) -> None:
         body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")

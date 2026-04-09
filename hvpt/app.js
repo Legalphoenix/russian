@@ -40,6 +40,10 @@ const state = {
   isGenerating: false,
   isSaving: false,
   ttsReady: false,
+  userRecording: null,
+  isRecording: false,
+  mediaRecorder: null,
+  mediaStream: null,
 };
 
 const refs = {
@@ -67,6 +71,7 @@ const refs = {
   variantList: document.getElementById("variant-list"),
   libraryCount: document.getElementById("library-count"),
   libraryList: document.getElementById("library-list"),
+  recordButton: document.getElementById("record-button"),
 };
 
 function setNotice(kind, message) {
@@ -177,7 +182,7 @@ function syncComposerMeta() {
   refs.saveButton.textContent = hasLoadedPhrase ? "Save as new phrase" : "Save phrase";
   refs.updateButton.hidden = !hasLoadedPhrase;
 
-  const variantReady = state.variants.length > 0;
+  const variantReady = state.variants.length > 0 || Boolean(state.userRecording);
   refs.generateButton.disabled = !state.ttsReady || state.isGenerating;
   refs.saveButton.disabled = state.isSaving;
   refs.updateButton.disabled = !hasLoadedPhrase || !state.formDirty || state.isSaving;
@@ -193,6 +198,9 @@ function collectPhrasePayload() {
   }
   if (!payload.voices.length) {
     throw new Error("Select at least one voice.");
+  }
+  if (state.userRecording?.serverUrl) {
+    payload.recordingUrl = state.userRecording.serverUrl;
   }
   return payload;
 }
@@ -254,15 +262,40 @@ function upsertPhrase(phrase) {
 }
 
 function renderVariants() {
-  if (!state.variants.length) {
+  const hasContent = state.variants.length > 0 || state.userRecording;
+
+  if (!hasContent) {
     refs.packSummary.textContent = "Generate a pack to start listening.";
     refs.variantList.innerHTML = `<div class="empty-state">Your voice variants will land here with built-in audio players and quick cycle controls.</div>`;
     syncComposerMeta();
     return;
   }
 
-  refs.packSummary.textContent = `${state.variants.length} generated pass${state.variants.length === 1 ? "" : "es"} ready`;
-  refs.variantList.innerHTML = state.variants
+  const counts = [];
+  if (state.variants.length) counts.push(`${state.variants.length} generated`);
+  if (state.userRecording) counts.push("your recording");
+  refs.packSummary.textContent = counts.join(" + ") + " ready";
+
+  let html = "";
+
+  if (state.userRecording) {
+    const isPlaying = state.playingVariantId === "user-recording";
+    html += `
+      <article class="variant-card variant-card-user ${isPlaying ? "is-playing" : ""}" data-variant-id="user-recording">
+        <div class="variant-top">
+          <span class="voice-badge voice-badge-user">You</span>
+          <span class="variant-meta">Your recording</span>
+        </div>
+        <div class="variant-actions">
+          <button class="mini-button play-variant-button" type="button" data-variant-id="user-recording">Play</button>
+          <button class="mini-button re-record-button" type="button">Re-record</button>
+          <audio class="audio-player" controls preload="auto" data-variant-id="user-recording" src="${state.userRecording.url}"></audio>
+        </div>
+      </article>
+    `;
+  }
+
+  html += state.variants
     .map((variant) => {
       const isPlaying = variant.id === state.playingVariantId;
       return `
@@ -280,6 +313,8 @@ function renderVariants() {
       `;
     })
     .join("");
+
+  refs.variantList.innerHTML = html;
   applyPlayingState();
   syncComposerMeta();
 }
@@ -324,6 +359,14 @@ function populateComposer(phrase) {
   refs.speedInput.value = phrase.speed || 1;
   setLoadedPhrase(phrase);
   setVoiceSelection(phrase.voices || state.defaultVoices);
+  clearUserRecording();
+  if (phrase.recordingUrl) {
+    state.userRecording = {
+      id: "user-recording",
+      url: phrase.recordingUrl,
+      serverUrl: phrase.recordingUrl,
+    };
+  }
   state.variants = [];
   state.playingVariantId = "";
   renderVariants();
@@ -338,6 +381,7 @@ function clearComposer() {
   refs.instructionsInput.value = "";
   refs.speedInput.value = "1";
   setLoadedPhrase(null);
+  clearUserRecording();
   state.variants = [];
   state.playingVariantId = "";
   setVoiceSelection(state.defaultVoices);
@@ -429,13 +473,17 @@ async function playVariantAndWait(variantId, token) {
 }
 
 async function cycleVariants({ random = false } = {}) {
-  if (!state.variants.length) {
+  if (!state.variants.length && !state.userRecording) {
     return;
   }
 
   stopCycle();
   const token = state.cycleToken;
-  const queue = random ? shuffle(state.variants) : [...state.variants];
+  let items = [...state.variants];
+  if (state.userRecording) {
+    items.unshift({ id: "user-recording" });
+  }
+  const queue = random ? shuffle(items) : items;
   setNotice("info", random ? "Shuffle cycle running." : "Cycle running.");
 
   try {
@@ -582,6 +630,99 @@ async function loadPhrase(phraseId, { practice = false } = {}) {
   }
 }
 
+function clearUserRecording() {
+  if (state.userRecording) {
+    if (state.userRecording.blob) {
+      URL.revokeObjectURL(state.userRecording.url);
+    }
+    state.userRecording = null;
+  }
+}
+
+function updateRecordButton() {
+  if (!refs.recordButton) return;
+  if (state.isRecording) {
+    refs.recordButton.innerHTML = '<span class="record-dot is-recording"></span> Stop recording';
+    refs.recordButton.classList.add("is-recording");
+  } else {
+    refs.recordButton.innerHTML = '<span class="record-dot"></span> Record yourself';
+    refs.recordButton.classList.remove("is-recording");
+  }
+}
+
+async function startRecording() {
+  if (state.isRecording) {
+    stopRecording();
+    return;
+  }
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    state.mediaStream = stream;
+    const recorder = new MediaRecorder(stream);
+    const chunks = [];
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    };
+
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((track) => track.stop());
+      state.mediaStream = null;
+      state.mediaRecorder = null;
+      state.isRecording = false;
+      updateRecordButton();
+
+      const mimeType = recorder.mimeType || "audio/webm";
+      const blob = new Blob(chunks, { type: mimeType });
+      clearUserRecording();
+      setNotice("info", "Uploading recording...");
+
+      try {
+        const response = await window.fetch(`${API_BASE}/recording`, {
+          method: "POST",
+          headers: { "Content-Type": mimeType },
+          body: blob,
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Upload failed.");
+
+        state.userRecording = {
+          id: "user-recording",
+          url: result.url,
+          serverUrl: result.url,
+        };
+        renderVariants();
+        setNotice("success", "Recording saved to server.");
+      } catch (uploadError) {
+        state.userRecording = {
+          id: "user-recording",
+          blob,
+          url: URL.createObjectURL(blob),
+        };
+        renderVariants();
+        setNotice("warning", "Recording saved locally (server upload failed).");
+      }
+    };
+
+    state.mediaRecorder = recorder;
+    state.isRecording = true;
+    updateRecordButton();
+    recorder.start();
+    setNotice("info", 'Recording... Click "Stop recording" when done.');
+  } catch (error) {
+    state.isRecording = false;
+    updateRecordButton();
+    setNotice("error", "Microphone access denied or not available.");
+  }
+}
+
+function stopRecording() {
+  if (state.mediaRecorder && state.mediaRecorder.state !== "inactive") {
+    state.mediaRecorder.stop();
+  }
+}
+
 function bindEvents() {
   renderPresets();
 
@@ -649,7 +790,20 @@ function bindEvents() {
     setNotice("info", "Playback stopped.");
   });
 
+  refs.recordButton.addEventListener("click", () => {
+    if (state.isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  });
+
   refs.variantList.addEventListener("click", (event) => {
+    const reRecordBtn = event.target.closest(".re-record-button");
+    if (reRecordBtn) {
+      startRecording();
+      return;
+    }
     const button = event.target.closest(".play-variant-button");
     if (!button) {
       return;
