@@ -365,6 +365,7 @@ function populateComposer(phrase) {
       id: "user-recording",
       url: phrase.recordingUrl,
       serverUrl: phrase.recordingUrl,
+      phraseText: (phrase.text || "").trim(),
     };
   }
   state.variants = [];
@@ -513,6 +514,10 @@ async function generateCurrentPhrase({ silent = false } = {}) {
   } catch (error) {
     setNotice("warning", error.message);
     return;
+  }
+
+  if (state.userRecording && state.userRecording.phraseText !== payload.text) {
+    clearUserRecording();
   }
 
   state.isGenerating = true;
@@ -691,6 +696,7 @@ async function startRecording() {
           id: "user-recording",
           url: result.url,
           serverUrl: result.url,
+          phraseText: refs.phraseInput.value.trim(),
         };
         renderVariants();
         setNotice("success", "Recording saved to server.");
@@ -699,6 +705,7 @@ async function startRecording() {
           id: "user-recording",
           blob,
           url: URL.createObjectURL(blob),
+          phraseText: refs.phraseInput.value.trim(),
         };
         renderVariants();
         setNotice("warning", "Recording saved locally (server upload failed).");
