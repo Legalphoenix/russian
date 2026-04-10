@@ -1,127 +1,37 @@
+// ─── Constants & Data ─────────────────────────────────────────
+
 const STORAGE_KEY = "russian-possessive-matrix-state-v1";
 
 const categories = ["masc", "fem", "neut", "plur"];
-const phaseOrder = ["warmup", "matrix", "mastery"];
+const phaseOrder = ["warmup", "matrix", "typing", "listening", "mastery"];
 const invariantFamilies = new Set(["his", "her", "their"]);
 
 const categoryMeta = {
-  masc: {
-    label: "Masculine",
-    shortLabel: "masc",
-    nounLabel: "masculine noun",
-  },
-  fem: {
-    label: "Feminine",
-    shortLabel: "fem",
-    nounLabel: "feminine noun",
-  },
-  neut: {
-    label: "Neuter",
-    shortLabel: "neut",
-    nounLabel: "neuter noun",
-  },
-  plur: {
-    label: "Plural",
-    shortLabel: "plur",
-    nounLabel: "plural noun",
-  },
+  masc: { label: "Masculine", shortLabel: "masc", nounLabel: "masculine noun" },
+  fem: { label: "Feminine", shortLabel: "fem", nounLabel: "feminine noun" },
+  neut: { label: "Neuter", shortLabel: "neut", nounLabel: "neuter noun" },
+  plur: { label: "Plural", shortLabel: "plur", nounLabel: "plural noun" },
 };
 
 const familyMeta = {
-  my: {
-    label: "мой family",
-    display: "мой / моя / моё / мои",
-    colorClass: "family-my",
-  },
-  yourSg: {
-    label: "твой family",
-    display: "твой / твоя / твоё / твои",
-    colorClass: "family-your-sg",
-  },
-  his: {
-    label: "его",
-    display: "его",
-    colorClass: "family-his",
-  },
-  her: {
-    label: "её",
-    display: "её",
-    colorClass: "family-her",
-  },
-  our: {
-    label: "наш family",
-    display: "наш / наша / наше / наши",
-    colorClass: "family-our",
-  },
-  yourPl: {
-    label: "ваш family",
-    display: "ваш / ваша / ваше / ваши",
-    colorClass: "family-your-pl",
-  },
-  their: {
-    label: "их",
-    display: "их",
-    colorClass: "family-their",
-  },
+  my: { label: "мой family", display: "мой / моя / моё / мои", colorClass: "family-my" },
+  yourSg: { label: "твой family", display: "твой / твоя / твоё / твои", colorClass: "family-your-sg" },
+  his: { label: "его", display: "его", colorClass: "family-his" },
+  her: { label: "её", display: "её", colorClass: "family-her" },
+  our: { label: "наш family", display: "наш / наша / наше / наши", colorClass: "family-our" },
+  yourPl: { label: "ваш family", display: "ваш / ваша / ваше / ваши", colorClass: "family-your-pl" },
+  their: { label: "их", display: "их", colorClass: "family-their" },
 };
 
 const ownerRows = [
-  {
-    id: "ya",
-    label: "Я",
-    englishPossessive: "my",
-    familyKey: "my",
-    forms: { masc: "мой", fem: "моя", neut: "моё", plur: "мои" },
-  },
-  {
-    id: "ty",
-    label: "Ты",
-    englishPossessive: "your",
-    familyKey: "yourSg",
-    forms: { masc: "твой", fem: "твоя", neut: "твоё", plur: "твои" },
-  },
-  {
-    id: "on",
-    label: "Он",
-    englishPossessive: "his",
-    familyKey: "his",
-    forms: { masc: "его", fem: "его", neut: "его", plur: "его" },
-  },
-  {
-    id: "ona",
-    label: "Она",
-    englishPossessive: "her",
-    familyKey: "her",
-    forms: { masc: "её", fem: "её", neut: "её", plur: "её" },
-  },
-  {
-    id: "ono",
-    label: "Оно",
-    englishPossessive: "its",
-    familyKey: "his",
-    forms: { masc: "его", fem: "его", neut: "его", plur: "его" },
-  },
-  {
-    id: "my",
-    label: "Мы",
-    englishPossessive: "our",
-    familyKey: "our",
-    forms: { masc: "наш", fem: "наша", neut: "наше", plur: "наши" },
-  },
-  {
-    id: "vy",
-    label: "Вы",
-    englishPossessive: "your",
-    familyKey: "yourPl",
-    forms: { masc: "ваш", fem: "ваша", neut: "ваше", plur: "ваши" },
-  },
-  {
-    id: "oni",
-    label: "Они",
-    englishPossessive: "their",
-    familyKey: "their",
-    forms: { masc: "их", fem: "их", neut: "их", plur: "их" },
-  },
+  { id: "ya", label: "Я", englishPossessive: "my", familyKey: "my", forms: { masc: "мой", fem: "моя", neut: "моё", plur: "мои" } },
+  { id: "ty", label: "Ты", englishPossessive: "your", familyKey: "yourSg", forms: { masc: "твой", fem: "твоя", neut: "твоё", plur: "твои" } },
+  { id: "on", label: "Он", englishPossessive: "his", familyKey: "his", forms: { masc: "его", fem: "его", neut: "его", plur: "его" } },
+  { id: "ona", label: "Она", englishPossessive: "her", familyKey: "her", forms: { masc: "её", fem: "её", neut: "её", plur: "её" } },
+  { id: "ono", label: "Оно", englishPossessive: "its", familyKey: "his", forms: { masc: "его", fem: "его", neut: "его", plur: "его" } },
+  { id: "my", label: "Мы", englishPossessive: "our", familyKey: "our", forms: { masc: "наш", fem: "наша", neut: "наше", plur: "наши" } },
+  { id: "vy", label: "Вы", englishPossessive: "your", familyKey: "yourPl", forms: { masc: "ваш", fem: "ваша", neut: "ваше", plur: "ваши" } },
+  { id: "oni", label: "Они", englishPossessive: "their", familyKey: "their", forms: { masc: "их", fem: "их", neut: "их", plur: "их" } },
 ];
 
 const ownerById = Object.fromEntries(ownerRows.map((row) => [row.id, row]));
@@ -153,187 +63,24 @@ const nounBuckets = {
   ],
 };
 
-const canonicalNouns = Object.fromEntries(categories.map((category) => [category, nounBuckets[category][0]]));
+const canonicalNouns = Object.fromEntries(categories.map((cat) => [cat, nounBuckets[cat][0]]));
 
-const phaseMeta = {
-  warmup: {
-    title: "Step 1: Ending warm-up",
-    pill: "Warm-up",
-    badge: "Ending warm-up",
-    summary: "Manual: Warm-up",
-  },
-  matrix: {
-    title: "Step 2: Chart lab",
-    pill: "Chart lab",
-    badge: "Chart lab",
-    summary: "Manual: Chart lab",
-  },
-  mastery: {
-    title: "Step 3: Timed mastery loop",
-    pill: "Mastery",
-    badge: "Timed mastery",
-    summary: "Manual: Timed mastery",
-  },
-};
-
-const warmupSpecs = [
-  ...["ya", "ty", "my", "vy"].flatMap((ownerId) =>
-    categories.map((category) => ({
-      ownerId,
-      category,
-      options: Object.values(ownerById[ownerId].forms),
-      mode: "Ending warm-up",
-      subPrompt: "The owner stays fixed. Let the noun decide the ending.",
-    })),
-  ),
-  {
-    ownerId: "on",
-    category: "masc",
-    options: ["его", "её", "их"],
-    mode: "Invariant family",
-    subPrompt: "This row does not change by noun type. Just choose whose.",
-  },
-  {
-    ownerId: "ona",
-    category: "fem",
-    options: ["его", "её", "их"],
-    mode: "Invariant family",
-    subPrompt: "This row does not change by noun type. Just choose whose.",
-  },
-  {
-    ownerId: "ono",
-    category: "neut",
-    options: ["его", "её", "их"],
-    mode: "Invariant family",
-    subPrompt: "This row does not change by noun type. Just choose whose.",
-  },
-  {
-    ownerId: "oni",
-    category: "plur",
-    options: ["его", "её", "их"],
-    mode: "Invariant family",
-    subPrompt: "This row does not change by noun type. Just choose whose.",
-  },
+const sentenceFrames = [
+  { pre: "Это", post: "{noun}.", enPre: "This is", enPost: "{eng}." },
+  { pre: "Где", post: "{noun}?", enPre: "Where is", enPost: "{eng}?" },
+  { pre: "Вот", post: "{noun}.", enPre: "Here is", enPost: "{eng}." },
+  { pre: "", post: "{noun} здесь.", enPre: "", enPost: "{eng} is here." },
 ];
 
-const warmupItems = warmupSpecs.map((spec) =>
-  makeItem({
-    phase: "warmup",
-    ownerId: spec.ownerId,
-    category: spec.category,
-    noun: canonicalNouns[spec.category],
-    options: spec.options,
-    mode: spec.mode,
-    subPrompt: spec.subPrompt,
-  }),
-);
-
-const matrixItems = ownerRows.flatMap((owner) =>
-  categories.map((category) =>
-    makeItem({
-      phase: "matrix",
-      ownerId: owner.id,
-      category,
-      noun: canonicalNouns[category],
-      options: getColumnOptions(category),
-      mode: "Chart lab",
-      subPrompt: "Use the owner for the family. Use the noun for the column.",
-    }),
-  ),
-);
-
-const masteryItems = ownerRows.flatMap((owner) =>
-  categories.flatMap((category) =>
-    nounBuckets[category].map((noun) =>
-      makeItem({
-        phase: "mastery",
-        ownerId: owner.id,
-        category,
-        noun,
-        options: getColumnOptions(category),
-        mode: "Timed mastery",
-        subPrompt: "Same chart, but now with mixed nouns and no table-watching.",
-      }),
-    ),
-  ),
-);
-
-const allItems = [...warmupItems, ...matrixItems, ...masteryItems];
-const itemsById = Object.fromEntries(allItems.map((item) => [item.id, item]));
-const allCellIds = ownerRows.flatMap((owner) => categories.map((category) => cellId(owner.id, category)));
-
-const el = {
-  cardsSolved: document.querySelector("#cardsSolved"),
-  currentStreak: document.querySelector("#currentStreak"),
-  accuracyValue: document.querySelector("#accuracyValue"),
-  avgResponseValue: document.querySelector("#avgResponseValue"),
-  resetSessionButton: document.querySelector("#resetSessionButton"),
-  referenceMatrix: document.querySelector("#referenceMatrix"),
-  phaseTitle: document.querySelector("#phaseTitle"),
-  phasePill: document.querySelector("#phasePill"),
-  phaseProgress: document.querySelector("#phaseProgress"),
-  modeBadge: document.querySelector("#modeBadge"),
-  promptLabel: document.querySelector("#promptLabel"),
-  promptText: document.querySelector("#promptText"),
-  translationLine: document.querySelector("#translationLine"),
-  promptChipRow: document.querySelector("#promptChipRow"),
-  subPrompt: document.querySelector("#subPrompt"),
-  choiceNudge: document.querySelector("#choiceNudge"),
-  hintButton: document.querySelector("#hintButton"),
-  hintText: document.querySelector("#hintText"),
-  feedbackCard: document.querySelector("#feedbackCard"),
-  nextButton: document.querySelector("#nextButton"),
-  optionsGrid: document.querySelector("#optionsGrid"),
-  familyMasteryGrid: document.querySelector("#familyMasteryGrid"),
-  weakSpotList: document.querySelector("#weakSpotList"),
-  audioButton: document.querySelector("#audioButton"),
-  phaseOverrideSelect: document.querySelector("#phaseOverrideSelect"),
-  settingsSummary: document.querySelector("#settingsSummary"),
-  memoryNote: document.querySelector("#memoryNote"),
+const phaseMeta = {
+  warmup: { title: "Step 1: Warm-up", pill: "Warm-up", badge: "Warm-up", num: 1 },
+  matrix: { title: "Step 2: Chart Drill", pill: "Chart", badge: "Chart Drill", num: 2 },
+  typing: { title: "Step 3: Type It", pill: "Type", badge: "Type It", num: 3 },
+  listening: { title: "Step 4: Listen", pill: "Listen", badge: "Listen", num: 4 },
+  mastery: { title: "Step 5: Mastery", pill: "Speed", badge: "Speed Mastery", num: 5 },
 };
 
-const defaultState = {
-  currentPhase: "warmup",
-  phaseOverride: "auto",
-  turn: 0,
-  currentItemId: null,
-  currentOptionOrder: [],
-  currentSolved: false,
-  currentChoice: null,
-  hintVisible: false,
-  cardStartedAt: null,
-  savedAt: null,
-  totalAnswered: 0,
-  totalCorrect: 0,
-  streak: 0,
-  totalResponseMs: 0,
-  lastResponseMs: null,
-  itemStats: {},
-  cellStats: {},
-};
-
-let state = loadState();
-
-function makeItem({ phase, ownerId, category, noun, options, mode, subPrompt }) {
-  const owner = ownerById[ownerId];
-  return {
-    id: `${phase}-${ownerId}-${category}-${noun.key}`,
-    phase,
-    cellId: cellId(ownerId, category),
-    ownerId,
-    category,
-    noun,
-    answer: owner.forms[category],
-    options: [...options],
-    mode,
-    prompt: `___ ${noun.word}`,
-    translation: `${owner.englishPossessive} ${noun.gloss}`,
-    subPrompt,
-    hint: buildHint(owner, category, noun),
-    explanation: buildExplanation(owner, category, noun),
-    speechText: `Это ${owner.forms[category]} ${noun.word}.`,
-  };
-}
+// ─── Item Generation ──────────────────────────────────────────
 
 function cellId(ownerId, category) {
   return `${ownerId}-${category}`;
@@ -367,6 +114,224 @@ function buildExplanation(owner, category, noun) {
   return `${owner.label} picks the ${familyMeta[owner.familyKey].label}. Because ${noun.word} is a ${categoryMeta[category].nounLabel}, the correct form is ${answer}.`;
 }
 
+function makeItem({ phase, ownerId, category, noun, options, mode, subPrompt }) {
+  const owner = ownerById[ownerId];
+  const answer = owner.forms[category];
+  return {
+    id: `${phase}-${ownerId}-${category}-${noun.key}`,
+    phase,
+    cellId: cellId(ownerId, category),
+    ownerId,
+    category,
+    noun,
+    answer,
+    options: [...options],
+    mode,
+    prompt: `___ ${noun.word}`,
+    translation: `${owner.englishPossessive} ${noun.gloss}`,
+    subPrompt,
+    hint: buildHint(owner, category, noun),
+    explanation: buildExplanation(owner, category, noun),
+    speechText: `Это ${answer} ${noun.word}.`,
+  };
+}
+
+function makeListeningItem({ ownerId, category, noun, frame }) {
+  const owner = ownerById[ownerId];
+  const answer = owner.forms[category];
+  const options = invariantFamilies.has(owner.familyKey)
+    ? ["его", "её", "их"]
+    : [...new Set(Object.values(owner.forms))];
+
+  const post = frame.post.replace("{noun}", noun.word);
+  const enPost = frame.enPost.replace("{eng}", noun.gloss);
+
+  const item = makeItem({
+    phase: "listening",
+    ownerId,
+    category,
+    noun,
+    options,
+    mode: "Listen",
+    subPrompt: "Listen to the sentence. Choose the missing possessive.",
+  });
+
+  item.listenPre = frame.pre;
+  item.listenPost = post;
+  item.sentenceFull = [frame.pre, answer, post].filter(Boolean).join(" ");
+  item.sentenceBlank = [frame.pre, "___", post].filter(Boolean).join(" ");
+  item.translationFull = [frame.enPre, owner.englishPossessive, enPost].filter(Boolean).join(" ");
+
+  return item;
+}
+
+// ─── Item Collections ─────────────────────────────────────────
+
+const warmupSpecs = [
+  ...["ya", "ty", "my", "vy"].flatMap((ownerId) =>
+    categories.map((category) => ({
+      ownerId,
+      category,
+      options: Object.values(ownerById[ownerId].forms),
+      mode: "Ending warm-up",
+      subPrompt: "The owner stays fixed. Let the noun decide the ending.",
+    })),
+  ),
+  {
+    ownerId: "on", category: "masc",
+    options: ["его", "её", "их"],
+    mode: "Invariant family",
+    subPrompt: "This row does not change by noun type. Just choose whose.",
+  },
+  {
+    ownerId: "ona", category: "fem",
+    options: ["его", "её", "их"],
+    mode: "Invariant family",
+    subPrompt: "This row does not change by noun type. Just choose whose.",
+  },
+  {
+    ownerId: "ono", category: "neut",
+    options: ["его", "её", "их"],
+    mode: "Invariant family",
+    subPrompt: "This row does not change by noun type. Just choose whose.",
+  },
+  {
+    ownerId: "oni", category: "plur",
+    options: ["его", "её", "их"],
+    mode: "Invariant family",
+    subPrompt: "This row does not change by noun type. Just choose whose.",
+  },
+];
+
+const warmupItems = warmupSpecs.map((spec) =>
+  makeItem({
+    phase: "warmup",
+    ownerId: spec.ownerId,
+    category: spec.category,
+    noun: canonicalNouns[spec.category],
+    options: spec.options,
+    mode: spec.mode,
+    subPrompt: spec.subPrompt,
+  }),
+);
+
+const matrixItems = ownerRows.flatMap((owner) =>
+  categories.map((category) =>
+    makeItem({
+      phase: "matrix",
+      ownerId: owner.id,
+      category,
+      noun: canonicalNouns[category],
+      options: getColumnOptions(category),
+      mode: "Chart lab",
+      subPrompt: "Use the owner for the family. Use the noun for the column.",
+    }),
+  ),
+);
+
+const typingItems = ownerRows.flatMap((owner) =>
+  categories.map((category) =>
+    makeItem({
+      phase: "typing",
+      ownerId: owner.id,
+      category,
+      noun: canonicalNouns[category],
+      options: [],
+      mode: "Type it",
+      subPrompt: "Type the correct possessive form. Use the owner and noun gender to decide.",
+    }),
+  ),
+);
+
+let _listenIdx = 0;
+const listeningItems = ownerRows.flatMap((owner) =>
+  categories.map((category) => {
+    const noun = canonicalNouns[category];
+    const frame = sentenceFrames[_listenIdx % sentenceFrames.length];
+    _listenIdx++;
+    return makeListeningItem({ ownerId: owner.id, category, noun, frame });
+  }),
+);
+
+const masteryItems = ownerRows.flatMap((owner) =>
+  categories.flatMap((category) =>
+    nounBuckets[category].map((noun) =>
+      makeItem({
+        phase: "mastery",
+        ownerId: owner.id,
+        category,
+        noun,
+        options: getColumnOptions(category),
+        mode: "Timed mastery",
+        subPrompt: "Same chart, but now with mixed nouns and no table-watching.",
+      }),
+    ),
+  ),
+);
+
+const allItems = [...warmupItems, ...matrixItems, ...typingItems, ...listeningItems, ...masteryItems];
+const itemsById = Object.fromEntries(allItems.map((item) => [item.id, item]));
+const allCellIds = ownerRows.flatMap((owner) => categories.map((category) => cellId(owner.id, category)));
+
+// ─── DOM References ───────────────────────────────────────────
+
+const el = {
+  stepNav: document.querySelector("#stepNav"),
+  cardsSolved: document.querySelector("#cardsSolved"),
+  currentStreak: document.querySelector("#currentStreak"),
+  accuracyValue: document.querySelector("#accuracyValue"),
+  avgResponseValue: document.querySelector("#avgResponseValue"),
+  resetSessionButton: document.querySelector("#resetSessionButton"),
+  referenceMatrix: document.querySelector("#referenceMatrix"),
+  phaseTitle: document.querySelector("#phaseTitle"),
+  phaseProgress: document.querySelector("#phaseProgress"),
+  modeBadge: document.querySelector("#modeBadge"),
+  promptLabel: document.querySelector("#promptLabel"),
+  promptText: document.querySelector("#promptText"),
+  translationLine: document.querySelector("#translationLine"),
+  promptChipRow: document.querySelector("#promptChipRow"),
+  subPrompt: document.querySelector("#subPrompt"),
+  choiceNudge: document.querySelector("#choiceNudge"),
+  hintButton: document.querySelector("#hintButton"),
+  hintText: document.querySelector("#hintText"),
+  feedbackCard: document.querySelector("#feedbackCard"),
+  nextButton: document.querySelector("#nextButton"),
+  optionsGrid: document.querySelector("#optionsGrid"),
+  practiceOptions: document.querySelector("#practiceOptions"),
+  familyMasteryGrid: document.querySelector("#familyMasteryGrid"),
+  weakSpotList: document.querySelector("#weakSpotList"),
+  audioButton: document.querySelector("#audioButton"),
+  typingArea: document.querySelector("#typingArea"),
+  typingInput: document.querySelector("#typingInput"),
+  typingSubmit: document.querySelector("#typingSubmit"),
+  listeningControls: document.querySelector("#listeningControls"),
+  listenPlayBtn: document.querySelector("#listenPlayBtn"),
+};
+
+// ─── State Management ─────────────────────────────────────────
+
+const defaultState = {
+  currentPhase: "warmup",
+  phaseOverride: "auto",
+  turn: 0,
+  currentItemId: null,
+  currentOptionOrder: [],
+  currentSolved: false,
+  currentChoice: null,
+  hintVisible: false,
+  cardStartedAt: null,
+  savedAt: null,
+  totalAnswered: 0,
+  totalCorrect: 0,
+  streak: 0,
+  totalResponseMs: 0,
+  lastResponseMs: null,
+  itemStats: {},
+  cellStats: {},
+};
+
+let state = loadState();
+
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -381,7 +346,8 @@ function mergeState(candidate = {}) {
   const merged = structuredClone(defaultState);
   Object.assign(merged, candidate);
   merged.currentPhase = phaseOrder.includes(candidate.currentPhase) ? candidate.currentPhase : "warmup";
-  merged.phaseOverride = candidate.phaseOverride === "auto" || phaseOrder.includes(candidate.phaseOverride) ? candidate.phaseOverride : "auto";
+  merged.phaseOverride =
+    candidate.phaseOverride === "auto" || phaseOrder.includes(candidate.phaseOverride) ? candidate.phaseOverride : "auto";
   merged.currentItemId = itemsById[candidate.currentItemId] ? candidate.currentItemId : null;
   merged.currentOptionOrder = Array.isArray(candidate.currentOptionOrder) ? candidate.currentOptionOrder : [];
   merged.currentSolved = Boolean(candidate.currentSolved);
@@ -407,10 +373,7 @@ function saveState() {
 
 function ensureItemStats(itemId) {
   if (!state.itemStats[itemId]) {
-    state.itemStats[itemId] = {
-      seen: 0,
-      lastTurn: -1,
-    };
+    state.itemStats[itemId] = { seen: 0, lastTurn: -1 };
   }
   return state.itemStats[itemId];
 }
@@ -418,30 +381,25 @@ function ensureItemStats(itemId) {
 function ensureCellStats(id) {
   if (!state.cellStats[id]) {
     state.cellStats[id] = {
-      seen: 0,
-      correct: 0,
-      wrong: 0,
-      streak: 0,
-      dueAt: 0,
-      lastTurn: -1,
-      totalResponseMs: 0,
-      correctResponseMs: 0,
-      lastResponseMs: null,
+      seen: 0, correct: 0, wrong: 0, streak: 0,
+      dueAt: 0, lastTurn: -1,
+      totalResponseMs: 0, correctResponseMs: 0, lastResponseMs: null,
     };
   }
-
-  const stats = state.cellStats[id];
-  stats.seen = Number.isFinite(stats.seen) ? stats.seen : 0;
-  stats.correct = Number.isFinite(stats.correct) ? stats.correct : 0;
-  stats.wrong = Number.isFinite(stats.wrong) ? stats.wrong : 0;
-  stats.streak = Number.isFinite(stats.streak) ? stats.streak : 0;
-  stats.dueAt = Number.isFinite(stats.dueAt) ? stats.dueAt : 0;
-  stats.lastTurn = Number.isFinite(stats.lastTurn) ? stats.lastTurn : -1;
-  stats.totalResponseMs = Number.isFinite(stats.totalResponseMs) ? stats.totalResponseMs : 0;
-  stats.correctResponseMs = Number.isFinite(stats.correctResponseMs) ? stats.correctResponseMs : 0;
-  stats.lastResponseMs = Number.isFinite(stats.lastResponseMs) ? stats.lastResponseMs : null;
-  return stats;
+  const s = state.cellStats[id];
+  s.seen = Number.isFinite(s.seen) ? s.seen : 0;
+  s.correct = Number.isFinite(s.correct) ? s.correct : 0;
+  s.wrong = Number.isFinite(s.wrong) ? s.wrong : 0;
+  s.streak = Number.isFinite(s.streak) ? s.streak : 0;
+  s.dueAt = Number.isFinite(s.dueAt) ? s.dueAt : 0;
+  s.lastTurn = Number.isFinite(s.lastTurn) ? s.lastTurn : -1;
+  s.totalResponseMs = Number.isFinite(s.totalResponseMs) ? s.totalResponseMs : 0;
+  s.correctResponseMs = Number.isFinite(s.correctResponseMs) ? s.correctResponseMs : 0;
+  s.lastResponseMs = Number.isFinite(s.lastResponseMs) ? s.lastResponseMs : null;
+  return s;
 }
+
+// ─── Phase Logic ──────────────────────────────────────────────
 
 function getActivePhase() {
   return state.phaseOverride === "auto" ? state.currentPhase : state.phaseOverride;
@@ -450,6 +408,8 @@ function getActivePhase() {
 function getPoolForPhase(phase) {
   if (phase === "warmup") return warmupItems;
   if (phase === "matrix") return matrixItems;
+  if (phase === "typing") return typingItems;
+  if (phase === "listening") return listeningItems;
   return masteryItems;
 }
 
@@ -458,10 +418,11 @@ function getCurrentPool() {
 }
 
 function isValidOptionOrder(item) {
+  if (!item.options.length) return true;
   return (
     Array.isArray(state.currentOptionOrder) &&
     state.currentOptionOrder.length === item.options.length &&
-    item.options.every((option) => state.currentOptionOrder.includes(option))
+    item.options.every((opt) => state.currentOptionOrder.includes(opt))
   );
 }
 
@@ -470,29 +431,43 @@ function updatePhaseIfNeeded() {
     const ready = warmupItems.every((item) => ensureCellStats(item.cellId).correct > 0);
     if (ready) state.currentPhase = "matrix";
   }
-
   if (state.currentPhase === "matrix") {
     const allSeen = allCellIds.every((id) => ensureCellStats(id).seen > 0);
-    if (allSeen) state.currentPhase = "mastery";
+    if (allSeen) state.currentPhase = "typing";
+  }
+  if (state.currentPhase === "typing") {
+    const typedSeen = typingItems.filter((item) => ensureItemStats(item.id).seen > 0).length;
+    if (typedSeen >= 16) state.currentPhase = "listening";
+  }
+  if (state.currentPhase === "listening") {
+    const listenSeen = listeningItems.filter((item) => ensureItemStats(item.id).seen > 0).length;
+    if (listenSeen >= 16) state.currentPhase = "mastery";
   }
 }
 
 function phaseProgressText() {
-  const activePhase = getActivePhase();
-
-  if (activePhase === "warmup") {
+  const phase = getActivePhase();
+  if (phase === "warmup") {
     const mastered = warmupItems.filter((item) => ensureCellStats(item.cellId).correct > 0).length;
     return `${mastered} / ${warmupItems.length} mastered`;
   }
-
-  if (activePhase === "matrix") {
+  if (phase === "matrix") {
     const seen = allCellIds.filter((id) => ensureCellStats(id).seen > 0).length;
     return `${seen} / ${allCellIds.length} cells seen`;
   }
-
+  if (phase === "typing") {
+    const typed = typingItems.filter((item) => ensureItemStats(item.id).seen > 0).length;
+    return `${typed} / ${typingItems.length} typed`;
+  }
+  if (phase === "listening") {
+    const listened = listeningItems.filter((item) => ensureItemStats(item.id).seen > 0).length;
+    return `${listened} / ${listeningItems.length} heard`;
+  }
   const steady = allCellIds.filter((id) => cellMastery(id) >= 0.8).length;
   return `${steady} / ${allCellIds.length} cells steady`;
 }
+
+// ─── Scoring ──────────────────────────────────────────────────
 
 function averageSeenMs(stats) {
   return stats.seen ? stats.totalResponseMs / stats.seen : null;
@@ -512,35 +487,31 @@ function cellMastery(id) {
   const stats = ensureCellStats(id);
   const total = stats.correct + stats.wrong;
   if (!total) return 0.08;
-
   const accuracy = stats.correct / total;
   const speed = speedScoreFromMs(averageCorrectMs(stats) || averageSeenMs(stats));
   const streakBonus = Math.min(0.08, stats.streak * 0.02);
-
   return clamp(accuracy * 0.72 + speed * 0.22 + streakBonus, 0.05, 0.99);
 }
 
 function candidateScore(item, currentTurn) {
   const cell = ensureCellStats(item.cellId);
-  const itemStats = ensureItemStats(item.id);
+  const itemSt = ensureItemStats(item.id);
   const dueBonus = cell.dueAt <= currentTurn ? 12 : 0;
   const unseenBonus = cell.seen === 0 ? 8 : 0;
   const weakBonus = (1 - cellMastery(item.cellId)) * 12;
   const wrongBonus = cell.wrong * 2.6;
   const slowBonus = Math.max(0, ((averageCorrectMs(cell) || averageSeenMs(cell) || 5200) - 2600) / 900);
   const cellRepeatPenalty = cell.lastTurn === currentTurn - 1 ? -10 : 0;
-  const itemRepeatPenalty = itemStats.lastTurn === currentTurn - 1 ? -4 : 0;
-
+  const itemRepeatPenalty = itemSt.lastTurn === currentTurn - 1 ? -4 : 0;
   return dueBonus + unseenBonus + weakBonus + wrongBonus + slowBonus + cellRepeatPenalty + itemRepeatPenalty + Math.random();
 }
 
 function pickNextItemId() {
   const pool = getCurrentPool();
-  const currentTurn = state.turn;
+  const turn = state.turn;
   const ranked = [...pool]
-    .sort((a, b) => candidateScore(b, currentTurn) - candidateScore(a, currentTurn))
+    .sort((a, b) => candidateScore(b, turn) - candidateScore(a, turn))
     .filter((item) => item.id !== state.currentItemId || pool.length === 1);
-
   return ranked[0]?.id || pool[0]?.id || null;
 }
 
@@ -550,292 +521,6 @@ function currentItem() {
 
 function itemMatchesActivePhase(item) {
   return item.phase === getActivePhase();
-}
-
-function startNextCard() {
-  updatePhaseIfNeeded();
-  state.currentItemId = pickNextItemId();
-  const item = currentItem();
-  state.currentOptionOrder = item ? shuffle([...item.options]) : [];
-  state.currentSolved = false;
-  state.currentChoice = null;
-  state.hintVisible = false;
-  state.lastResponseMs = null;
-  state.cardStartedAt = Date.now();
-  saveState();
-  render();
-}
-
-function renderPhaseMeta() {
-  const meta = phaseMeta[getActivePhase()];
-  el.phaseTitle.textContent = meta.title;
-  el.phasePill.textContent = meta.pill;
-  el.phaseProgress.textContent = phaseProgressText();
-}
-
-function renderHeaderMetrics() {
-  const accuracy = state.totalAnswered ? Math.round((state.totalCorrect / state.totalAnswered) * 100) : 0;
-  const averageMs = state.totalAnswered ? state.totalResponseMs / state.totalAnswered : 0;
-
-  el.cardsSolved.textContent = `${state.totalAnswered}`;
-  el.currentStreak.textContent = `${state.streak}`;
-  el.accuracyValue.textContent = `${accuracy}%`;
-  el.avgResponseValue.textContent = averageMs ? formatDuration(averageMs) : "0.0s";
-}
-
-function renderPrompt() {
-  const item = currentItem();
-  if (!item) return;
-
-  const owner = ownerById[item.ownerId];
-  const family = familyMeta[owner.familyKey];
-
-  el.modeBadge.textContent = phaseMeta[getActivePhase()].badge;
-  el.promptLabel.textContent = "Build the phrase";
-  el.promptText.innerHTML = formatPrompt(item.prompt);
-  el.translationLine.textContent = item.translation;
-  el.promptChipRow.innerHTML = `
-    <span class="prompt-chip"><strong>Owner</strong>${owner.label}</span>
-    <span class="prompt-chip"><strong>Column</strong>${categoryMeta[item.category].label}</span>
-    <span class="prompt-chip ${family.colorClass}"><strong>Family</strong>${familyMeta[owner.familyKey].label}</span>
-  `;
-  el.subPrompt.textContent = item.subPrompt;
-  el.choiceNudge.textContent = state.currentSolved
-    ? "Good. Read the feedback, then move to the next card."
-    : "Tap the correct form below.";
-  el.hintButton.textContent = state.hintVisible ? "Hide hint" : "Reveal hint";
-  el.hintText.textContent = state.hintVisible ? item.hint : "";
-}
-
-function renderOptions() {
-  const item = currentItem();
-  if (!item) return;
-
-  const options = isValidOptionOrder(item) ? state.currentOptionOrder : [...item.options];
-  el.optionsGrid.innerHTML = options
-    .map((option) => {
-      const selected = state.currentChoice === option;
-      const correct = option === item.answer;
-      let classes = "option-button";
-
-      if (selected) classes += " is-selected";
-      if (state.currentSolved && correct) classes += " is-correct";
-      if (state.currentSolved && selected && !correct) classes += " is-wrong";
-
-      return `
-        <button
-          class="${classes}"
-          type="button"
-          data-option="${option}"
-          ${state.currentSolved ? "disabled" : ""}
-        >
-          ${option}
-        </button>
-      `;
-    })
-    .join("");
-}
-
-function renderFeedback() {
-  const item = currentItem();
-  if (!item) return;
-
-  if (!state.currentSolved) {
-    el.feedbackCard.classList.add("is-hidden");
-    el.feedbackCard.classList.remove("is-correct", "is-wrong");
-    el.feedbackCard.innerHTML = `
-      <p class="feedback-title">Pick an answer to see the logic.</p>
-      <p class="feedback-body">The explanation will tell you whether you missed the owner, the noun type, or speed.</p>
-    `;
-    return;
-  }
-
-  const correct = state.currentChoice === item.answer;
-  const speedLine = describeSpeed(state.lastResponseMs, correct);
-
-  el.feedbackCard.classList.remove("is-hidden");
-  el.feedbackCard.classList.toggle("is-correct", correct);
-  el.feedbackCard.classList.toggle("is-wrong", !correct);
-  el.feedbackCard.innerHTML = `
-    <p class="feedback-title">${correct ? `Correct in ${formatDuration(state.lastResponseMs)}.` : `Use ${item.answer}.`}</p>
-    <p class="feedback-body">${item.explanation} ${speedLine}</p>
-  `;
-}
-
-function renderReferenceMatrix() {
-  const item = currentItem();
-  const headMarkup = `
-    <div class="matrix-head">Person</div>
-    ${categories
-      .map(
-        (category) => `
-          <div class="matrix-head">
-            ${categoryMeta[category].label}
-            <span>${categoryMeta[category].shortLabel}</span>
-          </div>
-        `,
-      )
-      .join("")}
-  `;
-
-  const rowMarkup = ownerRows
-    .map((owner) => {
-      const family = familyMeta[owner.familyKey];
-      const ownerMarkup = `<div class="matrix-owner ${family.colorClass}">${owner.label}</div>`;
-      const cellMarkup = categories
-        .map((category) => {
-          const id = cellId(owner.id, category);
-          const active = item?.cellId === id ? "is-active" : "";
-          const mastery = cellMastery(id);
-          return `
-            <div class="matrix-cell ${family.colorClass} ${active}" style="--mastery: ${mastery}">
-              <span class="matrix-word">${owner.forms[category]}</span>
-              <span class="matrix-percent">${Math.round(mastery * 100)}% mastery</span>
-            </div>
-          `;
-        })
-        .join("");
-
-      return ownerMarkup + cellMarkup;
-    })
-    .join("");
-
-  el.referenceMatrix.innerHTML = headMarkup + rowMarkup;
-}
-
-function familyCellIds(familyKey) {
-  return ownerRows
-    .filter((owner) => owner.familyKey === familyKey)
-    .flatMap((owner) => categories.map((category) => cellId(owner.id, category)));
-}
-
-function familyMastery(familyKey) {
-  const ids = familyCellIds(familyKey);
-  const total = ids.reduce((sum, id) => sum + cellMastery(id), 0);
-  return total / ids.length;
-}
-
-function renderFamilyMastery() {
-  el.familyMasteryGrid.innerHTML = Object.entries(familyMeta)
-    .map(([familyKey, meta]) => {
-      const ids = familyCellIds(familyKey);
-      const aggregate = ids.reduce(
-        (acc, id) => {
-          const stats = ensureCellStats(id);
-          acc.correct += stats.correct;
-          acc.wrong += stats.wrong;
-          acc.correctResponseMs += stats.correctResponseMs;
-          return acc;
-        },
-        { correct: 0, wrong: 0, correctResponseMs: 0 },
-      );
-      const averageMs = aggregate.correct ? aggregate.correctResponseMs / aggregate.correct : null;
-      const mastery = familyMastery(familyKey);
-
-      return `
-        <article class="family-card ${meta.colorClass}" style="--mastery: ${mastery}">
-          <strong>${meta.display}</strong>
-          <span>${meta.label}</span>
-          <div class="family-track"><span class="family-track-fill"></span></div>
-          <small>${aggregate.correct} right / ${aggregate.wrong} missed${averageMs ? ` · ${formatDuration(averageMs)} avg` : ""}</small>
-        </article>
-      `;
-    })
-    .join("");
-}
-
-function renderWeakSpots() {
-  const weakest = [...allCellIds].sort((a, b) => cellMastery(a) - cellMastery(b)).slice(0, 4);
-
-  el.weakSpotList.innerHTML = weakest
-    .map((id) => {
-      const { ownerId, category } = parseCellId(id);
-      const owner = ownerById[ownerId];
-      const family = familyMeta[owner.familyKey];
-      const noun = canonicalNouns[category];
-      const stats = ensureCellStats(id);
-      const averageMs = averageCorrectMs(stats) || averageSeenMs(stats);
-
-      return `
-        <article class="weak-spot-item ${family.colorClass}">
-          <strong class="weak-title">${owner.forms[category]} ${noun.word}</strong>
-          <span class="weak-line">${owner.label} + ${categoryMeta[category].label}</span>
-          <span class="weak-line">${stats.correct} right / ${stats.wrong} missed${averageMs ? ` · ${formatDuration(averageMs)} avg` : ""}</span>
-          <span class="weak-line">${Math.round(cellMastery(id) * 100)}% mastery</span>
-        </article>
-      `;
-    })
-    .join("");
-}
-
-function renderButtons() {
-  el.nextButton.disabled = !state.currentSolved;
-  el.nextButton.parentElement.classList.toggle("is-hidden", !state.currentSolved);
-}
-
-function renderSettings() {
-  el.phaseOverrideSelect.value = state.phaseOverride;
-  el.settingsSummary.textContent = state.phaseOverride === "auto" ? "Automatic step" : phaseMeta[state.phaseOverride].summary;
-  el.memoryNote.textContent =
-    state.phaseOverride === "auto"
-      ? "Progress, current card, and settings resume automatically on this device."
-      : "Manual step is active. Switch back to Automatic whenever you want the trainer to choose the next step.";
-}
-
-function render() {
-  renderPhaseMeta();
-  renderHeaderMetrics();
-  renderReferenceMatrix();
-  renderPrompt();
-  renderOptions();
-  renderFeedback();
-  renderFamilyMastery();
-  renderWeakSpots();
-  renderButtons();
-  renderSettings();
-}
-
-function submitAnswer(choice) {
-  const item = currentItem();
-  if (!item || state.currentSolved) return;
-
-  const itemStats = ensureItemStats(item.id);
-  const cellStats = ensureCellStats(item.cellId);
-  const responseMs = clamp(Date.now() - (state.cardStartedAt || Date.now()), 450, 15000);
-  const correct = choice === item.answer;
-
-  itemStats.seen += 1;
-  itemStats.lastTurn = state.turn;
-
-  cellStats.seen += 1;
-  cellStats.lastTurn = state.turn;
-  cellStats.totalResponseMs += responseMs;
-  cellStats.lastResponseMs = responseMs;
-
-  state.totalAnswered += 1;
-  state.totalResponseMs += responseMs;
-  state.currentChoice = choice;
-  state.currentSolved = true;
-  state.lastResponseMs = responseMs;
-
-  if (correct) {
-    cellStats.correct += 1;
-    cellStats.correctResponseMs += responseMs;
-    cellStats.streak += 1;
-    cellStats.dueAt = state.turn + nextInterval(responseMs, cellStats.streak);
-    state.totalCorrect += 1;
-    state.streak += 1;
-  } else {
-    cellStats.wrong += 1;
-    cellStats.streak = 0;
-    cellStats.dueAt = state.turn + 1;
-    state.streak = 0;
-  }
-
-  state.turn += 1;
-  saveState();
-  updatePhaseIfNeeded();
-  render();
 }
 
 function nextInterval(responseMs, streak) {
@@ -852,15 +537,98 @@ function describeSpeed(responseMs, correct) {
   return "Correct, but slow. Expect this cell again soon.";
 }
 
-function speakCurrentCard() {
-  const item = currentItem();
-  if (!item || !("speechSynthesis" in window)) return;
+// ─── Core Actions ─────────────────────────────────────────────
 
-  const utterance = new SpeechSynthesisUtterance(item.speechText);
-  utterance.lang = "ru-RU";
-  utterance.rate = 0.9;
-  window.speechSynthesis.cancel();
-  window.speechSynthesis.speak(utterance);
+function recordAnswer(correct) {
+  const item = currentItem();
+  if (!item) return;
+
+  const itemSt = ensureItemStats(item.id);
+  const cellSt = ensureCellStats(item.cellId);
+  const responseMs = clamp(Date.now() - (state.cardStartedAt || Date.now()), 450, 15000);
+
+  itemSt.seen += 1;
+  itemSt.lastTurn = state.turn;
+
+  cellSt.seen += 1;
+  cellSt.lastTurn = state.turn;
+  cellSt.totalResponseMs += responseMs;
+  cellSt.lastResponseMs = responseMs;
+
+  state.totalAnswered += 1;
+  state.totalResponseMs += responseMs;
+  state.currentSolved = true;
+  state.lastResponseMs = responseMs;
+
+  if (correct) {
+    cellSt.correct += 1;
+    cellSt.correctResponseMs += responseMs;
+    cellSt.streak += 1;
+    cellSt.dueAt = state.turn + nextInterval(responseMs, cellSt.streak);
+    state.totalCorrect += 1;
+    state.streak += 1;
+  } else {
+    cellSt.wrong += 1;
+    cellSt.streak = 0;
+    cellSt.dueAt = state.turn + 1;
+    state.streak = 0;
+  }
+
+  state.turn += 1;
+  saveState();
+  updatePhaseIfNeeded();
+}
+
+function submitAnswer(choice) {
+  const item = currentItem();
+  if (!item || state.currentSolved) return;
+
+  const correct = choice === item.answer;
+  state.currentChoice = choice;
+  recordAnswer(correct);
+  render();
+
+  if (getActivePhase() === "listening" && correct) {
+    setTimeout(() => speakFullSentence(item), 500);
+  }
+}
+
+function submitTyping() {
+  const item = currentItem();
+  if (!item || state.currentSolved) return;
+
+  const value = el.typingInput.value.trim();
+  if (!value) return;
+
+  const correct = normalizeRussian(value) === normalizeRussian(item.answer);
+  state.currentChoice = correct ? item.answer : value;
+  recordAnswer(correct);
+  render();
+
+  if (correct) speakCurrentCard();
+}
+
+function startNextCard() {
+  updatePhaseIfNeeded();
+  state.currentItemId = pickNextItemId();
+  const item = currentItem();
+  state.currentOptionOrder = item && item.options.length ? shuffle([...item.options]) : [];
+  state.currentSolved = false;
+  state.currentChoice = null;
+  state.hintVisible = false;
+  state.lastResponseMs = null;
+  state.cardStartedAt = Date.now();
+  saveState();
+  render();
+
+  const phase = getActivePhase();
+  if (phase === "typing") {
+    el.typingInput.value = "";
+    setTimeout(() => el.typingInput.focus(), 50);
+  }
+  if (phase === "listening" && item) {
+    setTimeout(() => speakWithBlank(item), 350);
+  }
 }
 
 function resetSession() {
@@ -868,6 +636,331 @@ function resetSession() {
   saveState();
   startNextCard();
 }
+
+// ─── Audio ────────────────────────────────────────────────────
+
+const hasSpeech = "speechSynthesis" in window;
+
+function speakCurrentCard() {
+  const item = currentItem();
+  if (!item || !hasSpeech) return;
+  const utterance = new SpeechSynthesisUtterance(item.speechText);
+  utterance.lang = "ru-RU";
+  utterance.rate = 0.9;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+}
+
+function speakWithBlank(item) {
+  if (!hasSpeech || !item) return;
+  const synth = window.speechSynthesis;
+  synth.cancel();
+
+  if (item.listenPre) {
+    const u = new SpeechSynthesisUtterance(item.listenPre);
+    u.lang = "ru-RU";
+    u.rate = 0.9;
+    synth.speak(u);
+  }
+
+  const blank = new SpeechSynthesisUtterance("blank");
+  blank.lang = "en-US";
+  blank.rate = 0.85;
+  synth.speak(blank);
+
+  if (item.listenPost) {
+    const u = new SpeechSynthesisUtterance(item.listenPost);
+    u.lang = "ru-RU";
+    u.rate = 0.9;
+    synth.speak(u);
+  }
+}
+
+function speakFullSentence(item) {
+  if (!hasSpeech || !item) return;
+  const synth = window.speechSynthesis;
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(item.sentenceFull);
+  u.lang = "ru-RU";
+  u.rate = 0.9;
+  synth.speak(u);
+}
+
+function speakWord(word) {
+  if (!hasSpeech || !word) return;
+  const synth = window.speechSynthesis;
+  synth.cancel();
+  const u = new SpeechSynthesisUtterance(word);
+  u.lang = "ru-RU";
+  u.rate = 0.85;
+  synth.speak(u);
+}
+
+// ─── Rendering ────────────────────────────────────────────────
+
+function render() {
+  const phase = getActivePhase();
+  const isTyping = phase === "typing";
+  const isListening = phase === "listening";
+
+  renderStepNav();
+  renderPhaseMeta();
+  renderHeaderMetrics();
+  renderReferenceMatrix();
+  renderPrompt(phase);
+
+  el.typingArea.style.display = isTyping ? "" : "none";
+  el.listeningControls.style.display = isListening ? "" : "none";
+  el.practiceOptions.style.display = isTyping ? "none" : "";
+  el.audioButton.style.display = isListening ? "none" : "";
+
+  if (!isTyping) renderOptions();
+
+  renderFeedback(phase);
+  renderFamilyMastery();
+  renderWeakSpots();
+  renderButtons();
+}
+
+function renderStepNav() {
+  const activePhase = getActivePhase();
+  const isAuto = state.phaseOverride === "auto";
+
+  el.stepNav.innerHTML =
+    `<button class="step-btn step-auto-btn ${isAuto ? "is-active" : ""}" data-step="auto">Auto</button>` +
+    phaseOrder
+      .map((phase) => {
+        const meta = phaseMeta[phase];
+        const active = activePhase === phase;
+        const recommended = isAuto && state.currentPhase === phase;
+        return `
+          <button class="step-btn ${active ? "is-active" : ""} ${recommended && !active ? "is-recommended" : ""}" data-step="${phase}">
+            <span class="step-num">${meta.num}</span>
+            <span class="step-label">${meta.pill}</span>
+          </button>`;
+      })
+      .join("");
+}
+
+function renderPhaseMeta() {
+  const meta = phaseMeta[getActivePhase()];
+  el.phaseTitle.textContent = meta.title;
+  el.phaseProgress.textContent = phaseProgressText();
+}
+
+function renderHeaderMetrics() {
+  const accuracy = state.totalAnswered ? Math.round((state.totalCorrect / state.totalAnswered) * 100) : 0;
+  const avgMs = state.totalAnswered ? state.totalResponseMs / state.totalAnswered : 0;
+  el.cardsSolved.textContent = `${state.totalAnswered}`;
+  el.currentStreak.textContent = `${state.streak}`;
+  el.accuracyValue.textContent = `${accuracy}%`;
+  el.avgResponseValue.textContent = avgMs ? formatDuration(avgMs) : "0.0s";
+}
+
+function renderPrompt(phase) {
+  const item = currentItem();
+  if (!item) return;
+
+  const owner = ownerById[item.ownerId];
+  const family = familyMeta[owner.familyKey];
+
+  el.modeBadge.textContent = phaseMeta[phase].badge;
+
+  if (phase === "listening") {
+    el.promptLabel.textContent = "Listen and choose";
+    if (state.currentSolved) {
+      el.promptText.innerHTML = `<span class="listen-revealed">${item.sentenceFull}</span>`;
+      el.translationLine.textContent = item.translationFull;
+    } else {
+      el.promptText.innerHTML = hasSpeech
+        ? '<span class="listen-placeholder">Listen to the sentence&hellip;</span>'
+        : `<span class="listen-fallback">${item.sentenceBlank}</span>`;
+      el.translationLine.textContent = "";
+    }
+    el.promptChipRow.innerHTML = `<span class="prompt-chip"><strong>Owner</strong>${owner.label}</span>`;
+    el.subPrompt.textContent = state.currentSolved ? "" : item.subPrompt;
+    el.choiceNudge.textContent = state.currentSolved
+      ? "The full sentence is shown above."
+      : "Pick the possessive that completes the sentence.";
+  } else {
+    el.promptLabel.textContent = phase === "typing" ? "Type the form" : "Build the phrase";
+    el.promptText.innerHTML = formatPrompt(item.prompt);
+    el.translationLine.textContent = item.translation;
+    el.promptChipRow.innerHTML = `
+      <span class="prompt-chip"><strong>Owner</strong>${owner.label}</span>
+      <span class="prompt-chip"><strong>Column</strong>${categoryMeta[item.category].label}</span>
+      <span class="prompt-chip ${family.colorClass}"><strong>Family</strong>${familyMeta[owner.familyKey].label}</span>
+    `;
+    el.subPrompt.textContent = item.subPrompt;
+    el.choiceNudge.textContent = state.currentSolved
+      ? "Good. Read the feedback, then move to the next card."
+      : phase === "typing"
+        ? "Type the correct possessive form and press Enter."
+        : "Tap the correct form below.";
+  }
+
+  el.hintButton.textContent = state.hintVisible ? "Hide hint" : "Reveal hint";
+  el.hintText.textContent = state.hintVisible ? item.hint : "";
+}
+
+function renderOptions() {
+  const item = currentItem();
+  if (!item) return;
+
+  const options = isValidOptionOrder(item) ? state.currentOptionOrder : [...item.options];
+  el.optionsGrid.innerHTML = options
+    .map((option) => {
+      const selected = state.currentChoice === option;
+      const correct = option === item.answer;
+      let classes = "option-button";
+      if (selected) classes += " is-selected";
+      if (state.currentSolved && correct) classes += " is-correct";
+      if (state.currentSolved && selected && !correct) classes += " is-wrong";
+      return `
+        <button class="${classes}" type="button" data-option="${option}" ${state.currentSolved ? "disabled" : ""}>
+          ${option}
+        </button>`;
+    })
+    .join("");
+}
+
+function renderFeedback(phase) {
+  const item = currentItem();
+  if (!item) return;
+
+  if (!state.currentSolved) {
+    el.feedbackCard.classList.add("is-hidden");
+    el.feedbackCard.classList.remove("is-correct", "is-wrong");
+    el.feedbackCard.innerHTML = `
+      <p class="feedback-title">Pick an answer to see the logic.</p>
+      <p class="feedback-body">The explanation will tell you whether you missed the owner, the noun type, or speed.</p>`;
+    return;
+  }
+
+  const correct = state.currentChoice === item.answer;
+  const speedLine = describeSpeed(state.lastResponseMs, correct);
+
+  el.feedbackCard.classList.remove("is-hidden");
+  el.feedbackCard.classList.toggle("is-correct", correct);
+  el.feedbackCard.classList.toggle("is-wrong", !correct);
+
+  if (phase === "typing" && !correct) {
+    el.feedbackCard.innerHTML = `
+      <p class="feedback-title">The correct form is <strong>${item.answer}</strong>.</p>
+      <p class="feedback-body">${item.explanation} You typed "${state.currentChoice}". ${speedLine}</p>`;
+  } else if (phase === "listening" && correct) {
+    el.feedbackCard.innerHTML = `
+      <p class="feedback-title">Correct! ${formatDuration(state.lastResponseMs)}</p>
+      <p class="feedback-body">${item.sentenceFull} &mdash; ${item.translationFull}. ${speedLine}</p>`;
+  } else {
+    el.feedbackCard.innerHTML = `
+      <p class="feedback-title">${correct ? `Correct in ${formatDuration(state.lastResponseMs)}.` : `Use ${item.answer}.`}</p>
+      <p class="feedback-body">${item.explanation} ${speedLine}</p>`;
+  }
+}
+
+function renderReferenceMatrix() {
+  const item = currentItem();
+  const headMarkup = `
+    <div class="matrix-head">Person</div>
+    ${categories
+      .map(
+        (cat) => `
+        <div class="matrix-head">
+          ${categoryMeta[cat].label}
+          <span>${categoryMeta[cat].shortLabel}</span>
+        </div>`,
+      )
+      .join("")}`;
+
+  const rowMarkup = ownerRows
+    .map((owner) => {
+      const family = familyMeta[owner.familyKey];
+      const ownerHtml = `<div class="matrix-owner ${family.colorClass}">${owner.label}</div>`;
+      const cells = categories
+        .map((cat) => {
+          const id = cellId(owner.id, cat);
+          const active = item?.cellId === id ? "is-active" : "";
+          const mastery = cellMastery(id);
+          return `
+            <div class="matrix-cell ${family.colorClass} ${active}" style="--mastery: ${mastery}" data-word="${owner.forms[cat]}">
+              <span class="matrix-word">${owner.forms[cat]}</span>
+              <span class="matrix-percent">${Math.round(mastery * 100)}%</span>
+            </div>`;
+        })
+        .join("");
+      return ownerHtml + cells;
+    })
+    .join("");
+
+  el.referenceMatrix.innerHTML = headMarkup + rowMarkup;
+}
+
+function familyCellIds(familyKey) {
+  return ownerRows
+    .filter((owner) => owner.familyKey === familyKey)
+    .flatMap((owner) => categories.map((cat) => cellId(owner.id, cat)));
+}
+
+function familyMastery(familyKey) {
+  const ids = familyCellIds(familyKey);
+  return ids.reduce((sum, id) => sum + cellMastery(id), 0) / ids.length;
+}
+
+function renderFamilyMastery() {
+  el.familyMasteryGrid.innerHTML = Object.entries(familyMeta)
+    .map(([key, meta]) => {
+      const ids = familyCellIds(key);
+      const agg = ids.reduce(
+        (acc, id) => {
+          const s = ensureCellStats(id);
+          acc.correct += s.correct;
+          acc.wrong += s.wrong;
+          acc.correctResponseMs += s.correctResponseMs;
+          return acc;
+        },
+        { correct: 0, wrong: 0, correctResponseMs: 0 },
+      );
+      const avgMs = agg.correct ? agg.correctResponseMs / agg.correct : null;
+      const mastery = familyMastery(key);
+      return `
+        <article class="family-card ${meta.colorClass}" style="--mastery: ${mastery}">
+          <strong>${meta.display}</strong>
+          <span>${meta.label}</span>
+          <div class="family-track"><span class="family-track-fill"></span></div>
+          <small>${agg.correct} right / ${agg.wrong} missed${avgMs ? ` · ${formatDuration(avgMs)} avg` : ""}</small>
+        </article>`;
+    })
+    .join("");
+}
+
+function renderWeakSpots() {
+  const weakest = [...allCellIds].sort((a, b) => cellMastery(a) - cellMastery(b)).slice(0, 4);
+  el.weakSpotList.innerHTML = weakest
+    .map((id) => {
+      const { ownerId, category } = parseCellId(id);
+      const owner = ownerById[ownerId];
+      const family = familyMeta[owner.familyKey];
+      const noun = canonicalNouns[category];
+      const stats = ensureCellStats(id);
+      const avgMs = averageCorrectMs(stats) || averageSeenMs(stats);
+      return `
+        <article class="weak-spot-item ${family.colorClass}">
+          <strong class="weak-title">${owner.forms[category]} ${noun.word}</strong>
+          <span class="weak-line">${owner.label} + ${categoryMeta[category].label}</span>
+          <span class="weak-line">${stats.correct} right / ${stats.wrong} missed${avgMs ? ` · ${formatDuration(avgMs)} avg` : ""}</span>
+          <span class="weak-line">${Math.round(cellMastery(id) * 100)}% mastery</span>
+        </article>`;
+    })
+    .join("");
+}
+
+function renderButtons() {
+  el.nextButton.disabled = !state.currentSolved;
+  el.nextButton.parentElement.classList.toggle("is-hidden", !state.currentSolved);
+}
+
+// ─── Helpers ──────────────────────────────────────────────────
 
 function formatPrompt(prompt) {
   return prompt.replace("___", '<span class="blank">___</span>');
@@ -883,12 +976,27 @@ function clamp(value, min, max) {
 
 function shuffle(list) {
   const copy = [...list];
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
   }
   return copy;
 }
+
+function normalizeRussian(text) {
+  return text.trim().toLowerCase().replace(/ё/g, "е");
+}
+
+// ─── Event Handlers ───────────────────────────────────────────
+
+el.stepNav.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-step]");
+  if (!btn) return;
+  const step = btn.dataset.step;
+  state.phaseOverride = step;
+  saveState();
+  startNextCard();
+});
 
 el.optionsGrid.addEventListener("click", (event) => {
   const button = event.target.closest("[data-option]");
@@ -896,29 +1004,56 @@ el.optionsGrid.addEventListener("click", (event) => {
   submitAnswer(button.dataset.option);
 });
 
-el.nextButton.addEventListener("click", () => {
-  startNextCard();
-});
+el.nextButton.addEventListener("click", () => startNextCard());
 
 el.hintButton.addEventListener("click", () => {
   state.hintVisible = !state.hintVisible;
   saveState();
-  renderPrompt();
+  renderPrompt(getActivePhase());
 });
 
-el.audioButton.addEventListener("click", () => {
-  speakCurrentCard();
+el.audioButton.addEventListener("click", () => speakCurrentCard());
+
+el.typingSubmit.addEventListener("click", () => submitTyping());
+
+el.typingInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    if (state.currentSolved) {
+      startNextCard();
+    } else {
+      submitTyping();
+    }
+  }
 });
 
-el.phaseOverrideSelect.addEventListener("change", (event) => {
-  state.phaseOverride = event.target.value;
-  saveState();
-  startNextCard();
+el.listenPlayBtn.addEventListener("click", () => {
+  const item = currentItem();
+  if (!item) return;
+  if (state.currentSolved) {
+    speakFullSentence(item);
+  } else {
+    speakWithBlank(item);
+  }
 });
 
-el.resetSessionButton.addEventListener("click", () => {
-  resetSession();
+el.referenceMatrix.addEventListener("click", (event) => {
+  const cell = event.target.closest(".matrix-cell");
+  if (!cell) return;
+  const word = cell.dataset.word;
+  if (word) speakWord(word);
 });
+
+el.resetSessionButton.addEventListener("click", () => resetSession());
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === " " && getActivePhase() === "listening" && !state.currentSolved) {
+    event.preventDefault();
+    const item = currentItem();
+    if (item) speakWithBlank(item);
+  }
+});
+
+// ─── Initialization ───────────────────────────────────────────
 
 updatePhaseIfNeeded();
 if (!currentItem() || !itemMatchesActivePhase(currentItem()) || !isValidOptionOrder(currentItem())) {
