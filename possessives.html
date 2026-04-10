@@ -34,40 +34,123 @@
         <a class="page-nav-link" href="./sentences/index.html">Sentence Coach</a>
       </nav>
 
-      <header class="hero panel possessive-hero">
-        <div class="hero-copy">
-          <p class="eyebrow">Russian Possessives Intensive</p>
-          <h1>Master <span>мой / твой / его / её / наш / ваш / их</span></h1>
-          <p class="lede">Use the owner first, then let the noun decide the ending. Fast, correct retrieval matters.</p>
-        </div>
+      <section class="panel practice-panel" id="practice">
+        <nav class="step-nav" id="stepNav" aria-label="Training steps"></nav>
 
-        <div class="hero-controls">
-          <div class="control-card metrics-card">
-            <div class="metric-row">
-              <span>Cards solved</span>
-              <strong id="cardsSolved">0</strong>
-            </div>
-            <div class="metric-row">
-              <span>Current streak</span>
-              <strong id="currentStreak">0</strong>
-            </div>
-            <div class="metric-row">
-              <span>Accuracy</span>
-              <strong id="accuracyValue">0%</strong>
-            </div>
-            <div class="metric-row">
-              <span>Avg answer time</span>
-              <strong id="avgResponseValue">0.0s</strong>
-            </div>
-            <button id="resetSessionButton" class="ghost-button" type="button">Reset session</button>
+        <div class="panel-heading">
+          <div>
+            <p class="section-kicker">Interactive drill</p>
+            <h2 id="phaseTitle">Step 1: Warm-up</h2>
           </div>
-
+          <div class="phase-status">
+            <span class="phase-progress" id="phaseProgress">0 / 20 mastered</span>
+          </div>
         </div>
-      </header>
+
+        <div class="practice-grid" id="drillView">
+          <article class="prompt-card">
+            <div class="prompt-toolbar">
+              <div class="meta-stack">
+                <span class="mode-badge" id="modeBadge">Warm-up</span>
+              </div>
+              <button id="audioButton" class="icon-button" type="button">Listen</button>
+            </div>
+
+            <div class="prompt-body">
+              <p class="prompt-label" id="promptLabel">Build the phrase</p>
+              <div id="promptText" class="prompt-text"></div>
+              <p class="translation-line" id="translationLine"></p>
+              <div class="prompt-chip-row" id="promptChipRow"></div>
+              <p id="subPrompt" class="sub-prompt"></p>
+              <p id="choiceNudge" class="choice-nudge">Tap the correct form below.</p>
+            </div>
+
+            <div class="listening-controls" id="listeningControls" style="display: none">
+              <button id="listenPlayBtn" class="listen-play-btn" type="button">
+                <span class="play-icon" aria-hidden="true">&#9654;</span>
+                Replay sentence
+              </button>
+            </div>
+
+            <div class="hint-row">
+              <button id="hintButton" class="ghost-button" type="button">Reveal hint</button>
+              <span id="hintText" class="hint-text" aria-live="polite"></span>
+            </div>
+
+            <div class="typing-area" id="typingArea" style="display: none">
+              <p class="sidebar-kicker">Type Your Answer</p>
+              <div class="typing-input-row">
+                <input
+                  type="text"
+                  id="typingInput"
+                  class="typing-input"
+                  placeholder="Type the possessive…"
+                  autocomplete="off"
+                  autocapitalize="off"
+                  spellcheck="false"
+                  lang="ru"
+                />
+                <button id="typingSubmit" class="primary-button typing-submit-btn" type="button">Check</button>
+              </div>
+            </div>
+
+            <div class="practice-options" id="practiceOptions">
+              <p class="sidebar-kicker">Choose The Form</p>
+              <div id="optionsGrid" class="options-grid practice-options-grid" aria-label="Answer choices"></div>
+            </div>
+
+            <div class="feedback-card" id="feedbackCard" aria-live="polite">
+              <p class="feedback-title">Pick an answer to see the logic.</p>
+              <p class="feedback-body">
+                The explanation will tell you whether you missed the owner, the noun type, or speed.
+              </p>
+            </div>
+
+            <div class="action-row">
+              <button id="nextButton" class="primary-button" type="button" disabled>Next card</button>
+            </div>
+          </article>
+
+          <aside class="sidebar-stack">
+            <article class="sidebar-card metrics-sidebar">
+              <p class="sidebar-kicker">Session stats</p>
+              <div class="metrics-mini">
+                <div class="metric-mini-row">
+                  <span>Solved</span>
+                  <strong id="cardsSolved">0</strong>
+                </div>
+                <div class="metric-mini-row">
+                  <span>Streak</span>
+                  <strong id="currentStreak">0</strong>
+                </div>
+                <div class="metric-mini-row">
+                  <span>Accuracy</span>
+                  <strong id="accuracyValue">0%</strong>
+                </div>
+                <div class="metric-mini-row">
+                  <span>Avg time</span>
+                  <strong id="avgResponseValue">0.0s</strong>
+                </div>
+              </div>
+              <button id="resetSessionButton" class="ghost-button reset-btn" type="button">Reset session</button>
+            </article>
+
+            <article class="sidebar-card">
+              <p class="sidebar-kicker">Mastery by family</p>
+              <div class="family-mastery-grid" id="familyMasteryGrid"></div>
+            </article>
+
+            <article class="sidebar-card">
+              <p class="sidebar-kicker">Most fragile cells</p>
+              <div id="weakSpotList" class="weak-spot-list"></div>
+            </article>
+          </aside>
+        </div>
+      </section>
 
       <section class="learn-grid possessive-learn-grid">
         <article class="rule-card panel matrix-panel">
-          <p class="section-kicker">The chart</p>
+          <p class="section-kicker">The chart &mdash; click any cell to hear it</p>
           <h2>Possessor chooses the family. Noun chooses the ending.</h2>
           <p>
             Use the row for the owner, then use the noun column. Some rows never change:
@@ -94,86 +177,21 @@
           <ol class="loop-list">
             <li>Warm up the changing families first.</li>
             <li>Mix the full chart once the endings stop wobbling.</li>
-            <li>Track each chart cell separately, not just the overall score.</li>
-            <li>Bring back slow or missed cells sooner.</li>
-            <li>Finish with mixed nouns so the chart works outside the table.</li>
+            <li>Type the forms from memory for deep encoding.</li>
+            <li>Listen to sentences and pick the missing possessive.</li>
+            <li>Speed round with mixed nouns &mdash; accuracy plus speed.</li>
           </ol>
           <div class="note-banner">
-            <strong>Important:</strong> mastery is accuracy plus speed. A cell is only steady when you can reach it
-            fast.
+            <strong>Tip:</strong> Use the step navigator above the drill to jump to any step at any time.
           </div>
         </aside>
-      </section>
-
-      <section class="panel practice-panel" id="practice">
-        <div class="panel-heading">
-          <div>
-            <p class="section-kicker">Interactive drill</p>
-            <h2 id="phaseTitle">Step 1: Ending warm-up</h2>
-          </div>
-          <div class="phase-status">
-            <span class="status-pill" id="phasePill">Warm-up</span>
-            <span class="phase-progress" id="phaseProgress">0 / 20 mastered</span>
-          </div>
-        </div>
-
-        <div class="practice-grid">
-          <article class="prompt-card">
-            <div class="prompt-toolbar">
-              <div class="meta-stack">
-                <span class="mode-badge" id="modeBadge">Warm-up</span>
-              </div>
-              <button id="audioButton" class="icon-button" type="button">Listen</button>
-            </div>
-
-            <div class="prompt-body">
-              <p class="prompt-label" id="promptLabel">Build the phrase</p>
-              <div id="promptText" class="prompt-text"></div>
-              <p class="translation-line" id="translationLine"></p>
-              <div class="prompt-chip-row" id="promptChipRow"></div>
-              <p id="subPrompt" class="sub-prompt"></p>
-              <p id="choiceNudge" class="choice-nudge">Tap the correct form below.</p>
-            </div>
-
-            <div class="hint-row">
-              <button id="hintButton" class="ghost-button" type="button">Reveal hint</button>
-              <span id="hintText" class="hint-text" aria-live="polite"></span>
-            </div>
-
-            <div class="practice-options">
-              <p class="sidebar-kicker">Choose The Form</p>
-              <div id="optionsGrid" class="options-grid practice-options-grid" aria-label="Answer choices"></div>
-            </div>
-
-            <div class="feedback-card" id="feedbackCard" aria-live="polite">
-              <p class="feedback-title">Pick an answer to see the logic.</p>
-              <p class="feedback-body">The explanation will tell you whether you missed the owner, the noun type, or speed.</p>
-            </div>
-
-            <div class="action-row">
-              <button id="nextButton" class="primary-button" type="button" disabled>Next card</button>
-            </div>
-          </article>
-
-          <aside class="sidebar-stack">
-            <article class="sidebar-card">
-              <p class="sidebar-kicker">Mastery by family</p>
-              <div class="family-mastery-grid" id="familyMasteryGrid"></div>
-            </article>
-
-            <article class="sidebar-card">
-              <p class="sidebar-kicker">Most fragile cells</p>
-              <div id="weakSpotList" class="weak-spot-list"></div>
-            </article>
-          </aside>
-        </div>
       </section>
 
       <section class="panel possessive-support">
         <p class="control-label">Mastery rule</p>
         <p class="microcopy">
-          Each cell in the chart keeps its own mastery score. Wrong answers lower it immediately. Correct answers
-          raise it, but fast correct answers raise it more.
+          Each cell in the chart keeps its own mastery score. Wrong answers lower it immediately. Correct answers raise
+          it, but fast correct answers raise it more.
         </p>
         <div class="speed-band-list" aria-label="Speed bands">
           <div class="speed-band">
@@ -224,30 +242,6 @@
             <p class="anchor-tip">Plural nouns point straight to the plural column.</p>
           </article>
         </div>
-      </section>
-
-      <section class="panel settings-panel">
-        <details class="settings-details">
-          <summary class="settings-summary-row">
-            <div>
-              <p class="section-kicker">Trainer settings</p>
-              <h2>Saved on this device</h2>
-            </div>
-            <span class="settings-summary" id="settingsSummary">Automatic step</span>
-          </summary>
-
-          <div class="settings-body">
-            <p class="settings-note" id="memoryNote">Progress, current card, and settings resume automatically on this device.</p>
-
-            <label class="settings-label" for="phaseOverrideSelect">Jump to step</label>
-            <select id="phaseOverrideSelect" class="settings-select">
-              <option value="auto">Automatic</option>
-              <option value="warmup">Step 1: Warm-up</option>
-              <option value="matrix">Step 2: Chart lab</option>
-              <option value="mastery">Step 3: Timed mastery</option>
-            </select>
-          </div>
-        </details>
       </section>
     </main>
 
