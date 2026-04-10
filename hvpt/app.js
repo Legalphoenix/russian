@@ -328,6 +328,17 @@ function renderVariants() {
   refs.variantList.innerHTML = html;
   applyPlayingState();
   syncComposerMeta();
+
+  refs.variantList.querySelectorAll("audio.audio-player").forEach((audio) => {
+    audio.addEventListener("error", () => {
+      const card = audio.closest(".variant-card");
+      if (card) {
+        const meta = card.querySelector(".variant-meta");
+        if (meta) meta.textContent = "Format not supported on this browser";
+        card.style.opacity = "0.5";
+      }
+    }, { once: true });
+  });
 }
 
 function renderLibrary() {
@@ -684,7 +695,14 @@ async function startRecording() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     state.mediaStream = stream;
-    const recorder = new MediaRecorder(stream);
+    const recorderOptions = {};
+    for (const mime of ["audio/mp4", "audio/aac", "audio/webm;codecs=opus", "audio/webm"]) {
+      if (typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported(mime)) {
+        recorderOptions.mimeType = mime;
+        break;
+      }
+    }
+    const recorder = new MediaRecorder(stream, recorderOptions);
     const chunks = [];
 
     recorder.ondataavailable = (event) => {

@@ -565,6 +565,10 @@ class HvptRequestHandler(SimpleHTTPRequestHandler):
             content_type = "audio/ogg"
         elif file_name.endswith(".wav"):
             content_type = "audio/wav"
+        elif file_name.endswith(".m4a") or file_name.endswith(".mp4"):
+            content_type = "audio/mp4"
+        elif file_name.endswith(".aac"):
+            content_type = "audio/aac"
         else:
             content_type = "audio/mpeg"
         self.send_response(HTTPStatus.OK.value)
