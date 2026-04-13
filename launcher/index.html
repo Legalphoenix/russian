@@ -275,6 +275,11 @@
     <div id="continueBanner"></div>
 
     <script>
+      // Register service worker for offline support
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      }
+
       const trainers = [
         {
           key: "russian-form-trainer-state-v1",
