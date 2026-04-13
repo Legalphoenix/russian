@@ -551,6 +551,30 @@ function itemMatchesActivePhase(item) {
   return item.phase === getActivePhase();
 }
 
+let timerPausedAt = null;
+let timerPausedAccumulated = 0;
+
+function togglePauseTimer() {
+  if (state.currentSolved) return;
+  if (timerPausedAt) {
+    timerPausedAccumulated += Date.now() - timerPausedAt;
+    timerPausedAt = null;
+  } else {
+    timerPausedAt = Date.now();
+  }
+}
+
+function resetPauseTimer() {
+  timerPausedAt = null;
+  timerPausedAccumulated = 0;
+}
+
+function getCardElapsedMs() {
+  const raw = Date.now() - (state.cardStartedAt || Date.now());
+  const paused = timerPausedAt ? Date.now() - timerPausedAt : 0;
+  return raw - timerPausedAccumulated - paused;
+}
+
 function nextInterval(responseMs, streak) {
   if (responseMs <= 2500) return 5 + Math.min(4, streak);
   if (responseMs <= 4500) return 3 + Math.min(3, streak);
@@ -573,7 +597,7 @@ function recordAnswer(correct) {
 
   const itemSt = ensureItemStats(item.id);
   const cellSt = ensureCellStats(item.cellId);
-  const responseMs = clamp(Date.now() - (state.cardStartedAt || Date.now()), 450, 15000);
+  const responseMs = clamp(getCardElapsedMs(), 450, 15000);
 
   itemSt.seen += 1;
   itemSt.lastTurn = state.turn;
@@ -646,6 +670,7 @@ function startNextCard() {
   state.hintVisible = false;
   state.lastResponseMs = null;
   state.cardStartedAt = Date.now();
+  resetPauseTimer();
   saveState();
   render();
 
@@ -1077,10 +1102,32 @@ el.resetSessionButton.addEventListener("click", () => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === " " && getActivePhase() === "listening" && !state.currentSolved) {
+  if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA") return;
+  const key = event.key;
+  const phase = getActivePhase();
+
+  if (key === " " && phase === "listening" && !state.currentSolved) {
     event.preventDefault();
     const item = currentItem();
     if (item) speakWithBlank(item);
+    return;
+  }
+
+  if (key >= "1" && key <= "9" && !state.currentSolved && (phase === "warmup" || phase === "matrix" || phase === "listening" || phase === "mastery")) {
+    const buttons = el.optionsGrid.querySelectorAll("[data-option]");
+    const index = parseInt(key) - 1;
+    if (index < buttons.length) {
+      event.preventDefault();
+      submitAnswer(buttons[index].dataset.option);
+    }
+  }
+
+  if ((key === "Enter" || key === " ") && state.currentSolved) {
+    event.preventDefault();
+    startNextCard();
+  }
+  if (key === "p" && !state.currentSolved) {
+    togglePauseTimer();
   }
 });
 

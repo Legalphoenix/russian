@@ -808,10 +808,29 @@ function currentItem() {
   return state.currentItemId ? itemsById[state.currentItemId] : null;
 }
 
+let timerPausedAt = null;
+let timerPausedAccumulated = 0;
+
+function togglePauseTimer() {
+  if (state.currentSolved) return;
+  if (timerPausedAt) {
+    timerPausedAccumulated += Date.now() - timerPausedAt;
+    timerPausedAt = null;
+  } else {
+    timerPausedAt = Date.now();
+  }
+}
+
+function resetPauseTimer() {
+  timerPausedAt = null;
+  timerPausedAccumulated = 0;
+}
+
 function currentElapsedMs() {
   if (state.currentSolved) return state.currentResponseMs || 0;
   if (!state.currentStartedAt) return 0;
-  return Date.now() - state.currentStartedAt;
+  const paused = timerPausedAt ? Date.now() - timerPausedAt : 0;
+  return Date.now() - state.currentStartedAt - timerPausedAccumulated - paused;
 }
 
 function avgCorrectMsForStats(stats) {
@@ -1006,6 +1025,7 @@ function startNextCard() {
   state.currentHintVisible = false;
   state.currentStartedAt = Date.now();
   state.currentResponseMs = null;
+  resetPauseTimer();
   saveState();
   render();
 }
@@ -1247,6 +1267,32 @@ function resetSession() {
   startNextCard();
   scrollCardIntoView();
 }
+
+document.addEventListener("keydown", (event) => {
+  if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA") return;
+  const key = event.key;
+  if (key >= "1" && key <= "9" && !state.currentSolved) {
+    const buttons = el.optionsGrid.querySelectorAll("[data-option]");
+    const index = parseInt(key) - 1;
+    if (index < buttons.length) {
+      event.preventDefault();
+      submitAnswer(buttons[index].dataset.option);
+    }
+  }
+  if ((key === "Enter" || key === " ") && state.currentSolved) {
+    event.preventDefault();
+    startNextCard();
+    scrollCardIntoView();
+  }
+  if (key === "h" && !state.currentSolved) {
+    state.hintVisible = !state.hintVisible;
+    saveState();
+    renderPrompt();
+  }
+  if (key === "p" && !state.currentSolved) {
+    togglePauseTimer();
+  }
+});
 
 el.optionsGrid.addEventListener("click", (event) => {
   const button = event.target.closest("[data-option]");

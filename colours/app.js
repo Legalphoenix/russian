@@ -1315,6 +1315,32 @@ el.optionsGrid.addEventListener("click", (event) => {
   submitAnswer(button.dataset.option);
 });
 
+document.addEventListener("keydown", (event) => {
+  if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA") return;
+  const key = event.key;
+  if (key >= "1" && key <= "9" && !state.currentSolved) {
+    const buttons = el.optionsGrid.querySelectorAll("[data-option]");
+    const index = parseInt(key) - 1;
+    if (index < buttons.length) {
+      event.preventDefault();
+      submitAnswer(buttons[index].dataset.option);
+    }
+  }
+  if ((key === "Enter" || key === " ") && state.currentSolved) {
+    event.preventDefault();
+    startNextCard();
+  }
+  if (key === "h" && !state.currentSolved) {
+    state.hintVisible = !state.hintVisible;
+    saveState();
+    renderPrompt();
+  }
+  if (key === "p") {
+    timerPaused = !timerPaused;
+    renderLiveTimer();
+  }
+});
+
 el.nextButton.addEventListener("click", () => {
   startNextCard();
 });
