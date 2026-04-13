@@ -117,6 +117,14 @@
               <div id="optionsGrid" class="options-grid" aria-label="Plural choices"></div>
             </div>
 
+            <div class="typing-area is-hidden" id="typingArea">
+              <p class="sidebar-kicker">Type the plural form</p>
+              <div class="typing-row">
+                <input type="text" id="typingInput" class="typing-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type the plural..." lang="ru" />
+                <button id="typingSubmit" class="primary-button" type="button">Check</button>
+              </div>
+            </div>
+
             <div class="feedback-card" id="feedbackCard" aria-live="polite">
               <p class="feedback-title">Pick an answer to see the rule and your time.</p>
               <p class="feedback-body">Fast and correct matters more than slow recognition.</p>

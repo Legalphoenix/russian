@@ -714,6 +714,9 @@ const el = {
   phaseOverrideSelect: document.querySelector("#phaseOverrideSelect"),
   settingsSummary: document.querySelector("#settingsSummary"),
   memoryNote: document.querySelector("#memoryNote"),
+  typingArea: document.querySelector("#typingArea"),
+  typingInput: document.querySelector("#typingInput"),
+  typingSubmit: document.querySelector("#typingSubmit"),
 };
 
 const defaultState = {
@@ -1073,9 +1076,34 @@ function renderPrompt() {
   renderTimerChip();
 }
 
+function shouldUseTypingMode() {
+  if (getActivePhase() !== "mastery") return false;
+  const item = currentItem();
+  if (!item) return false;
+  const stats = ensureItemStats(item.id);
+  return stats.seen >= 3;
+}
+
 function renderOptions() {
   const item = currentItem();
   if (!item) return;
+
+  const useTyping = shouldUseTypingMode();
+  el.optionsGrid.parentElement.classList.toggle("is-hidden", useTyping);
+  el.typingArea.classList.toggle("is-hidden", !useTyping);
+
+  if (useTyping) {
+    if (!state.currentSolved) {
+      el.typingInput.value = "";
+      el.typingInput.disabled = false;
+      el.typingSubmit.disabled = false;
+      setTimeout(() => el.typingInput.focus(), 50);
+    } else {
+      el.typingInput.disabled = true;
+      el.typingSubmit.disabled = true;
+    }
+    return;
+  }
 
   const answer = item.plural;
   const options = isValidOptionOrder(item) ? state.currentOptionOrder : buildOptionOrder(item);
@@ -1309,6 +1337,29 @@ el.hintButton.addEventListener("click", () => {
   state.currentHintVisible = !state.currentHintVisible;
   saveState();
   renderPrompt();
+});
+
+function submitTyping() {
+  const item = currentItem();
+  if (!item || state.currentSolved) return;
+  const typed = el.typingInput.value.trim().toLowerCase();
+  if (!typed) return;
+  const answer = item.plural;
+  submitAnswer(typed === answer.toLowerCase() ? answer : typed);
+}
+
+el.typingSubmit.addEventListener("click", submitTyping);
+
+el.typingInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    if (state.currentSolved) {
+      startNextCard();
+      scrollCardIntoView();
+    } else {
+      submitTyping();
+    }
+  }
 });
 
 el.phaseOverrideSelect.addEventListener("change", (event) => {

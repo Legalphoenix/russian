@@ -211,6 +211,14 @@
               <div id="optionsGrid" class="options-grid practice-options-grid" aria-label="Answer choices"></div>
             </div>
 
+            <div class="typing-area is-hidden" id="typingArea">
+              <p class="sidebar-kicker">Type the correct form</p>
+              <div class="typing-row">
+                <input type="text" id="typingInput" class="typing-input" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type the Russian form..." lang="ru" />
+                <button id="typingSubmit" class="primary-button" type="button">Check</button>
+              </div>
+            </div>
+
             <div class="feedback-card" id="feedbackCard" aria-live="polite">
               <p class="feedback-title">Pick an answer to see the logic.</p>
               <p class="feedback-body">The explanation will tell you exactly what cue to notice next time.</p>

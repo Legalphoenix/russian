@@ -918,3 +918,37 @@ select {
   font-size: 0.88rem;
   opacity: 0.78;
 }
+
+/* ─── Typing area (mastery phase) ────────────────────────── */
+
+.typing-area {
+  padding: 12px 0;
+}
+
+.typing-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.typing-input {
+  flex: 1;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-md, 16px);
+  font: inherit;
+  font-size: 1.15rem;
+  background: var(--panel-strong);
+  color: var(--ink);
+  transition: border-color 160ms ease;
+}
+
+.typing-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.typing-input:disabled {
+  opacity: 0.5;
+}
