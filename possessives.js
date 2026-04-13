@@ -369,6 +369,7 @@ function mergeState(candidate = {}) {
 function saveState() {
   state.savedAt = Date.now();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (typeof syncToServer === "function") syncToServer(state);
 }
 
 function ensureItemStats(itemId) {
@@ -1180,4 +1181,12 @@ if (!currentItem() || !itemMatchesActivePhase(currentItem()) || !isValidOptionOr
 } else {
   if (!state.currentSolved) state.cardStartedAt = Date.now();
   render();
+}
+
+if (typeof initSync === "function") {
+  initSync("possessives", () => state, (serverState) => {
+    state = migrateState(serverState);
+    saveState();
+    render();
+  });
 }

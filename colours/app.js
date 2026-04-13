@@ -543,6 +543,7 @@ function saveState() {
   state.savedAt = Date.now();
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (typeof syncToServer === "function") syncToServer(state);
   } catch {
     // Ignore storage failures and keep the session running.
   }
@@ -1422,4 +1423,12 @@ if (!currentItem() || !itemMatchesActivePhase(currentItem()) || !isValidOptionOr
   } else {
     startCardClock();
   }
+}
+
+if (typeof initSync === "function") {
+  initSync("colours", () => state, (serverState) => {
+    state = migrateState(serverState);
+    saveState();
+    render();
+  });
 }

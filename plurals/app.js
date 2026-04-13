@@ -770,6 +770,7 @@ function mergeState(candidate) {
 function saveState() {
   state.savedAt = Date.now();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (typeof syncToServer === "function") syncToServer(state);
 }
 
 function ensureItemStats(itemId) {
@@ -1483,3 +1484,11 @@ if (!currentItem() || !itemMatchesActivePhase(currentItem()) || !isValidOptionOr
   render();
 }
 startTimerLoop();
+
+if (typeof initSync === "function") {
+  initSync("plurals", () => state, (serverState) => {
+    state = migrateState(serverState);
+    saveState();
+    render();
+  });
+}
