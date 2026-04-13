@@ -1,6 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;700&family=Space+Grotesk:wght@400;500;700&display=swap");
 
 :root {
+  /* ─── Sentences-specific palette ────────────────────────── */
   --bg-cream: #fff7ef;
   --bg-mint: #eaf7f3;
   --card: rgba(255, 255, 255, 0.82);
@@ -22,6 +23,16 @@
   --radius-md: 18px;
   --radius-sm: 12px;
   --border: rgba(23, 48, 64, 0.08);
+
+  /* ─── Shared design system aliases ─────────────────────── */
+  --bg: var(--bg-cream);
+  --panel: var(--card);
+  --panel-strong: var(--card-strong);
+  --line: var(--border);
+  --muted: var(--ink-soft);
+  --accent: var(--coral);
+  --accent-soft: var(--coral-soft);
+  --radius-xl: var(--radius-lg);
 }
 
 * {

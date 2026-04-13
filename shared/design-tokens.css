@@ -1,0 +1,51 @@
+/**
+ * Russian Trainer Design System — Canonical token reference.
+ *
+ * All trainers should define these CSS custom properties in their :root.
+ * This file documents the expected tokens; import it as a fallback layer
+ * or use it as reference when building new trainers.
+ *
+ * Usage: @import url("/shared/design-tokens.css");
+ *        (before trainer-specific styles)
+ */
+
+:root {
+  /* ─── Surface colors ────────────────────────────────────── */
+  --bg: #f7f1e4;                            /* Page background */
+  --panel: rgba(255, 251, 244, 0.82);       /* Card/surface background */
+  --panel-strong: rgba(255, 251, 244, 0.94);/* Opaque panel */
+  --line: rgba(49, 37, 28, 0.12);           /* Borders, dividers */
+
+  /* ─── Text colors ───────────────────────────────────────── */
+  --ink: #1f1a17;                           /* Primary text */
+  --muted: #5d5048;                         /* Secondary/helper text */
+
+  /* ─── Accent colors ─────────────────────────────────────── */
+  --accent: #bf5c39;                        /* Primary accent (Russian rust) */
+  --accent-soft: rgba(191, 92, 57, 0.12);   /* Accent tint for backgrounds */
+
+  /* ─── Feedback colors ───────────────────────────────────── */
+  --success: #215f48;                       /* Correct answer */
+  --warning: #8f6118;                       /* Correct but slow */
+  --danger: #9a3c33;                        /* Wrong answer */
+
+  /* ─── Elevation ─────────────────────────────────────────── */
+  --shadow: 0 22px 56px rgba(69, 45, 19, 0.1);
+
+  /* ─── Radii ─────────────────────────────────────────────── */
+  --radius-xl: 28px;                        /* Large cards, hero */
+  --radius-lg: 22px;                        /* Standard cards */
+  --radius-md: 16px;                        /* Buttons, inputs */
+  --radius-sm: 10px;                        /* Pills, chips */
+
+  /* ─── Spacing ───────────────────────────────────────────── */
+  --space-xs: 0.4rem;
+  --space-sm: 0.7rem;
+  --space-md: 1rem;
+  --space-lg: 1.4rem;
+  --space-xl: 2rem;
+
+  /* ─── Typography ────────────────────────────────────────── */
+  --font-heading: "Literata", Georgia, serif;
+  --font-body: "Space Grotesk", system-ui, sans-serif;
+}
