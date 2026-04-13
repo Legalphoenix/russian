@@ -838,7 +838,30 @@ function itemIsSteady(item) {
   return stats.correct >= 2 && itemMastery(item) >= 0.78;
 }
 
+const phaseLabels = {
+  regular: { title: "Regular Endings", next: "Tricky Shifts" },
+  tricky: { title: "Tricky Shifts", next: "Irregular Plurals" },
+  irregular: { title: "Irregular Plurals", next: "Mixed Mastery" },
+  mastery: { title: "Mixed Mastery", next: null },
+};
+
+function showPhaseBanner(fromPhase, toPhase) {
+  const from = phaseLabels[fromPhase]?.title || fromPhase;
+  const to = phaseLabels[toPhase]?.title || toPhase;
+  const banner = document.createElement("div");
+  banner.className = "phase-banner";
+  banner.innerHTML = `<strong>${from} complete</strong><span>Advancing to ${to}</span>`;
+  document.body.appendChild(banner);
+  requestAnimationFrame(() => banner.classList.add("is-visible"));
+  setTimeout(() => {
+    banner.classList.remove("is-visible");
+    setTimeout(() => banner.remove(), 400);
+  }, 2800);
+}
+
 function updatePhaseIfNeeded() {
+  const before = state.currentPhase;
+
   if (state.currentPhase === "regular" && getPoolForPhase("regular").every((item) => ensureItemStats(item.id).seen > 0)) {
     state.currentPhase = "tricky";
   }
@@ -849,6 +872,10 @@ function updatePhaseIfNeeded() {
 
   if (state.currentPhase === "irregular" && getPoolForPhase("irregular").every((item) => ensureItemStats(item.id).seen > 0)) {
     state.currentPhase = "mastery";
+  }
+
+  if (state.currentPhase !== before && state.phaseOverride === "auto") {
+    showPhaseBanner(before, state.currentPhase);
   }
 }
 

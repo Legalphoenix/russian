@@ -426,7 +426,31 @@ function isValidOptionOrder(item) {
   );
 }
 
+const phaseLabels = {
+  warmup: { title: "Warm-up", next: "Chart Drill" },
+  matrix: { title: "Chart Drill", next: "Type It" },
+  typing: { title: "Type It", next: "Listen" },
+  listening: { title: "Listen", next: "Speed Mastery" },
+  mastery: { title: "Speed Mastery", next: null },
+};
+
+function showPhaseBanner(fromPhase, toPhase) {
+  const from = phaseLabels[fromPhase]?.title || fromPhase;
+  const to = phaseLabels[toPhase]?.title || toPhase;
+  const banner = document.createElement("div");
+  banner.className = "phase-banner";
+  banner.innerHTML = `<strong>${from} complete</strong><span>Advancing to ${to}</span>`;
+  document.body.appendChild(banner);
+  requestAnimationFrame(() => banner.classList.add("is-visible"));
+  setTimeout(() => {
+    banner.classList.remove("is-visible");
+    setTimeout(() => banner.remove(), 400);
+  }, 2800);
+}
+
 function updatePhaseIfNeeded() {
+  const before = state.currentPhase;
+
   if (state.currentPhase === "warmup") {
     const ready = warmupItems.every((item) => ensureCellStats(item.cellId).correct > 0);
     if (ready) state.currentPhase = "matrix";
@@ -442,6 +466,10 @@ function updatePhaseIfNeeded() {
   if (state.currentPhase === "listening") {
     const listenSeen = listeningItems.filter((item) => ensureItemStats(item.id).seen > 0).length;
     if (listenSeen >= 16) state.currentPhase = "mastery";
+  }
+
+  if (state.currentPhase !== before) {
+    showPhaseBanner(before, state.currentPhase);
   }
 }
 

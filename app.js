@@ -712,7 +712,29 @@ function phaseProgressText() {
   return `${masteredForms} / ${allForms.length} forms steady`;
 }
 
+const phaseLabels = {
+  warmup: { title: "Warm-up", next: "Sentence Lab" },
+  sentences: { title: "Sentence Lab", next: "Mixed Mastery" },
+  mastery: { title: "Mixed Mastery", next: null },
+};
+
+function showPhaseBanner(fromPhase, toPhase) {
+  const from = phaseLabels[fromPhase]?.title || fromPhase;
+  const to = phaseLabels[toPhase]?.title || toPhase;
+  const banner = document.createElement("div");
+  banner.className = "phase-banner";
+  banner.innerHTML = `<strong>${from} complete</strong><span>Advancing to ${to}</span>`;
+  document.body.appendChild(banner);
+  requestAnimationFrame(() => banner.classList.add("is-visible"));
+  setTimeout(() => {
+    banner.classList.remove("is-visible");
+    setTimeout(() => banner.remove(), 400);
+  }, 2800);
+}
+
 function updatePhaseIfNeeded() {
+  const before = state.currentPhase;
+
   if (state.currentPhase === "warmup") {
     const ready = warmupItems.every((item) => (state.itemStats[item.id]?.correct || 0) > 0);
     if (ready) state.currentPhase = "sentences";
@@ -721,6 +743,10 @@ function updatePhaseIfNeeded() {
   if (state.currentPhase === "sentences") {
     const allSeen = sentenceItems.every((item) => (state.itemStats[item.id]?.seen || 0) > 0);
     if (allSeen) state.currentPhase = "mastery";
+  }
+
+  if (state.currentPhase !== before && state.phaseOverride === "auto") {
+    showPhaseBanner(before, state.currentPhase);
   }
 }
 

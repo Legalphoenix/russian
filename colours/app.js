@@ -585,7 +585,29 @@ function isValidOptionOrder(item) {
   );
 }
 
+const phaseLabels = {
+  visual: { title: "Swatch to Word", next: "Agreement Lab" },
+  agreement: { title: "Agreement Lab", next: "Listening + Mastery" },
+  mastery: { title: "Listening + Mastery", next: null },
+};
+
+function showPhaseBanner(fromPhase, toPhase) {
+  const from = phaseLabels[fromPhase]?.title || fromPhase;
+  const to = phaseLabels[toPhase]?.title || toPhase;
+  const banner = document.createElement("div");
+  banner.className = "phase-banner";
+  banner.innerHTML = `<strong>${from} complete</strong><span>Advancing to ${to}</span>`;
+  document.body.appendChild(banner);
+  requestAnimationFrame(() => banner.classList.add("is-visible"));
+  setTimeout(() => {
+    banner.classList.remove("is-visible");
+    setTimeout(() => banner.remove(), 400);
+  }, 2800);
+}
+
 function updatePhaseIfNeeded() {
+  const before = state.currentPhase;
+
   if (state.currentPhase === "visual") {
     const ready = visualItems.every((item) => (state.itemStats[item.id]?.correct || 0) > 0);
     if (ready) state.currentPhase = "agreement";
@@ -594,6 +616,10 @@ function updatePhaseIfNeeded() {
   if (state.currentPhase === "agreement") {
     const ready = agreementItems.every((item) => (state.itemStats[item.id]?.seen || 0) > 0);
     if (ready) state.currentPhase = "mastery";
+  }
+
+  if (state.currentPhase !== before && state.phaseOverride === "auto") {
+    showPhaseBanner(before, state.currentPhase);
   }
 }
 
