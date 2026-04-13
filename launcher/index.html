@@ -138,6 +138,62 @@
         line-height: 1.5;
       }
 
+      .card-progress {
+        margin-top: 10px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .progress-track {
+        flex: 1;
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(49, 37, 28, 0.08);
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        border-radius: 3px;
+        background: var(--teal);
+        transition: width 0.3s ease;
+      }
+
+      .progress-label {
+        font-size: 0.78rem;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .continue-banner {
+        margin-top: 18px;
+        padding: 16px 20px;
+        border-radius: var(--radius-lg);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+      }
+
+      .continue-banner p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .continue-banner a {
+        display: inline-flex;
+        align-items: center;
+        margin-top: 8px;
+        padding: 8px 16px;
+        border-radius: 999px;
+        background: var(--teal);
+        color: #fff;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+
       @media (max-width: 640px) {
         .shell {
           width: min(100% - 24px, 980px);
@@ -216,5 +272,114 @@
         </a>
       </section>
     </main>
+    <div id="continueBanner"></div>
+
+    <script>
+      const trainers = [
+        {
+          key: "russian-form-trainer-state-v1",
+          href: "/index/tenses/",
+          name: "was/budu Drill",
+          getProgress(state) {
+            if (!state.totalAnswered) return null;
+            const accuracy = state.totalCorrect / state.totalAnswered;
+            return { answered: state.totalAnswered, accuracy, label: `${state.totalAnswered} cards · ${Math.round(accuracy * 100)}%` };
+          },
+        },
+        {
+          key: "russian-possessive-matrix-state-v1",
+          href: "/index/possessives.html",
+          name: "Possessives Matrix",
+          getProgress(state) {
+            if (!state.totalAnswered) return null;
+            const accuracy = state.totalCorrect / state.totalAnswered;
+            return { answered: state.totalAnswered, accuracy, label: `${state.totalAnswered} cards · ${Math.round(accuracy * 100)}%` };
+          },
+        },
+        {
+          key: "russian-plural-trainer-state-v2",
+          href: "/index/plurals/",
+          name: "Plural Sprint",
+          getProgress(state) {
+            if (!state.totalAnswered) return null;
+            const accuracy = state.totalCorrect / state.totalAnswered;
+            return { answered: state.totalAnswered, accuracy, label: `${state.totalAnswered} cards · ${Math.round(accuracy * 100)}%` };
+          },
+        },
+        {
+          key: "russian-colour-studio-state-v1",
+          href: "/index/colours/",
+          name: "Colour Studio",
+          getProgress(state) {
+            if (!state.totalAnswered) return null;
+            const accuracy = state.totalCorrect / state.totalAnswered;
+            return { answered: state.totalAnswered, accuracy, label: `${state.totalAnswered} cards · ${Math.round(accuracy * 100)}%` };
+          },
+        },
+        {
+          key: "russian-sentence-coach-state-v1",
+          href: "/index/sentences/",
+          name: "Sentence Coach",
+          getProgress(state) {
+            if (!state.totalAttempts) return null;
+            return { answered: state.totalAttempts, accuracy: 0.5, label: `${state.totalAttempts} attempts` };
+          },
+        },
+        {
+          key: "russian-pronunciation-coach-state-v1",
+          href: "/index/pronunciation/",
+          name: "Pronunciation Coach",
+          getProgress(state) {
+            const ratings = state.ratings;
+            if (!ratings || !Object.keys(ratings).length) return null;
+            const count = Object.keys(ratings).length;
+            return { answered: count, accuracy: 0.5, label: `${count} chunks rated` };
+          },
+        },
+      ];
+
+      let mostRecent = null;
+
+      for (const trainer of trainers) {
+        try {
+          const raw = localStorage.getItem(trainer.key);
+          if (!raw) continue;
+          const state = JSON.parse(raw);
+          const progress = trainer.getProgress(state);
+          if (!progress) continue;
+
+          // Find the card by href
+          const card = document.querySelector(`a[href="${trainer.href}"]`);
+          if (card && !card.querySelector(".card-progress")) {
+            const div = document.createElement("div");
+            div.className = "card-progress";
+            div.innerHTML = `
+              <div class="progress-track"><div class="progress-fill" style="width: ${Math.round(progress.accuracy * 100)}%"></div></div>
+              <span class="progress-label">${progress.label}</span>
+            `;
+            card.appendChild(div);
+          }
+
+          // Track most recently used
+          if (state.savedAt && (!mostRecent || state.savedAt > mostRecent.savedAt)) {
+            mostRecent = { savedAt: state.savedAt, href: trainer.href, name: trainer.name, progress };
+          }
+        } catch {
+          // Ignore parse errors
+        }
+      }
+
+      // Show continue banner
+      if (mostRecent) {
+        const ago = Math.round((Date.now() - mostRecent.savedAt) / 60000);
+        const agoText = ago < 60 ? `${ago}m ago` : ago < 1440 ? `${Math.round(ago / 60)}h ago` : `${Math.round(ago / 1440)}d ago`;
+        document.getElementById("continueBanner").innerHTML = `
+          <section class="continue-banner">
+            <p>Last session: <strong>${mostRecent.name}</strong> (${agoText}) · ${mostRecent.progress.label}</p>
+            <a href="${mostRecent.href}">Continue studying</a>
+          </section>
+        `;
+      }
+    </script>
   </body>
 </html>
