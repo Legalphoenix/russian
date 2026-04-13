@@ -1240,6 +1240,48 @@ function submitAnswer(choice) {
   saveState();
   updatePhaseIfNeeded();
   render();
+  checkSessionSummary(correct);
+}
+
+// ─── Session summary ─────────────────────────────────────────
+let sessionCardsAnswered = 0;
+let sessionCorrectCount = 0;
+const SESSION_SUMMARY_INTERVAL = 15;
+const sessionStartedAt = Date.now();
+
+function checkSessionSummary(correct) {
+  sessionCardsAnswered += 1;
+  if (correct) sessionCorrectCount += 1;
+  if (sessionCardsAnswered % SESSION_SUMMARY_INTERVAL === 0) {
+    showSessionSummary();
+  }
+}
+
+function showSessionSummary() {
+  const accuracy = sessionCardsAnswered ? Math.round((sessionCorrectCount / sessionCardsAnswered) * 100) : 0;
+  const elapsed = Math.round((Date.now() - sessionStartedAt) / 60000);
+  const steady = colourFamilies.filter((f) => isFamilySteady(f.id)).length;
+  const overlay = document.createElement("div");
+  overlay.className = "session-summary-overlay";
+  overlay.innerHTML = `
+    <div class="session-summary-card">
+      <h3>Session check-in</h3>
+      <div class="summary-stats">
+        <div class="summary-stat"><strong>${sessionCardsAnswered}</strong><span>cards</span></div>
+        <div class="summary-stat"><strong>${accuracy}%</strong><span>accuracy</span></div>
+        <div class="summary-stat"><strong>${elapsed}m</strong><span>elapsed</span></div>
+        <div class="summary-stat"><strong>${steady}/${colourFamilies.length}</strong><span>steady</span></div>
+      </div>
+      <p class="summary-note">${accuracy >= 85 ? "Strong session. Keep going or take a break." : accuracy >= 65 ? "Solid progress. Consider slowing down on weak families." : "Lots of misses. A short break might help consolidation."}</p>
+      <button class="primary-button summary-dismiss" type="button">Continue</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  requestAnimationFrame(() => overlay.classList.add("is-visible"));
+  overlay.querySelector(".summary-dismiss").addEventListener("click", () => {
+    overlay.classList.remove("is-visible");
+    setTimeout(() => overlay.remove(), 300);
+  });
 }
 
 function speakCurrentCard() {

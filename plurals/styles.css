@@ -970,3 +970,75 @@ select {
   line-height: 1.45;
   color: var(--ink);
 }
+
+
+/* ─── Session summary overlay ────────────────────────────── */
+
+.session-summary-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(31, 26, 23, 0.45);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.session-summary-overlay.is-visible {
+  opacity: 1;
+}
+
+.session-summary-card {
+  background: var(--panel-strong, rgba(255, 251, 244, 0.96));
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 28px 32px;
+  max-width: 380px;
+  width: calc(100% - 32px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.18);
+  text-align: center;
+}
+
+.session-summary-card h3 {
+  margin: 0 0 16px;
+  font-size: 1.3rem;
+}
+
+.summary-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.summary-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.summary-stat strong {
+  font-size: 1.4rem;
+}
+
+.summary-stat span {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted, #5d5048);
+}
+
+.summary-note {
+  margin: 0 0 16px;
+  font-size: 0.92rem;
+  color: var(--muted, #5d5048);
+  line-height: 1.45;
+}
+
+.summary-dismiss {
+  min-width: 140px;
+}
