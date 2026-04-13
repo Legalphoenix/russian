@@ -1314,6 +1314,7 @@ el.phaseOverrideSelect.addEventListener("change", (event) => {
 });
 
 el.resetSessionButton.addEventListener("click", () => {
+  if (!window.confirm("Reset all progress? This cannot be undone.")) return;
   resetSession();
 });
 

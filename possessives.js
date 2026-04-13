@@ -1043,7 +1043,10 @@ el.referenceMatrix.addEventListener("click", (event) => {
   if (word) speakWord(word);
 });
 
-el.resetSessionButton.addEventListener("click", () => resetSession());
+el.resetSessionButton.addEventListener("click", () => {
+  if (!window.confirm("Reset all progress? This cannot be undone.")) return;
+  resetSession();
+});
 
 document.addEventListener("keydown", (event) => {
   if (event.key === " " && getActivePhase() === "listening" && !state.currentSolved) {
