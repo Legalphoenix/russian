@@ -12,23 +12,34 @@ git reset --hard 4a9b511e281884301cdc9f90216093a909b438a7
 ```
 
 ## How to revert individual changes
-Each group of changes is committed separately. Use `git log --oneline` to find the specific commit and `git revert <sha>` to undo it.
+Each group of changes is committed separately. Use `git revert <sha>` to undo a specific commit.
 
-## Change groups (in order)
-1. Quick Win #1-2: Fix nav bars + add Launcher link across all Russian trainers
-2. Quick Win #3-4: Reset button confirmation dialogs + standardized labels
-3. Quick Win #5: Phase-transition banners
-4. Quick Win #6: Keyboard shortcuts (1-4) for MCQ
-5. Quick Win #7: Pause timer for timed drills
-6. Medium #8: Extract shared utilities to shared/utils.js
-7. Medium #9: Optional "type the answer" mode for был/буду and Plurals
-8. Medium #10: Surface error patterns from existing data
-9. Medium #11: End-of-session summary
-10. Medium #12: Unify font stack
-11. Ambitious #13: Server-sync all Russian trainers
-12. Ambitious #14: Progress-aware launcher
-13. Ambitious #15: Shared MCQ drill engine (SKIPPED - too invasive for single PR)
-14. Ambitious #16: Unified SRS scheduler
-15. Ambitious #17: Cross-trainer skill graph (SKIPPED - requires #15 first)
-16. Ambitious #18: Service worker for offline use
-17. Ambitious #19: Unified design system (CSS variables)
+## Commit log (newest first)
+```
+05c791d Unify CSS design system with shared tokens and Sentences aliases
+a36a858 Add service worker for offline access to all trainers
+32a746f Add unified SRS scheduler and wire into was/budu and Plurals
+19b2e39 Add server sync for all 4 localStorage-only Russian trainers
+6e958a9 Add progress-aware launcher with continue suggestion
+bd9f492 Unify font stack to Literata + Space Grotesk across all trainers
+4dfadcf Add session check-in summary every 15 cards
+467b0c3 Surface error patterns in was/budu and Plurals weak spots
+3108c02 Add type-the-answer mode to was/budu and Plurals mastery phase
+d3ebb30 Add shared/utils.js with canonical utility functions
+4b53669 Add keyboard shortcuts and pause timer to MCQ trainers
+7837e99 Add phase-transition banners to all phased trainers
+3a9527f Add confirmation dialogs to reset buttons and standardize labels
+9505a94 Fix nav bars: add all 7 trainers + Launcher link across all Russian pages
+```
+
+## What was skipped
+- #15 Shared MCQ drill engine — Too invasive; would rewrite 4 trainer cores
+- #17 Cross-trainer skill graph — Requires #15 first
+
+## New files created
+- `shared/utils.js` — Canonical utility functions
+- `shared/sync.js` — Client-side server sync library
+- `shared/srs.js` — Unified spaced repetition scheduler
+- `shared/design-tokens.css` — Design system token reference
+- `backend/russian_sync.py` — Server sync service for 4 trainers
+- `sw.js` — Service worker for offline support
