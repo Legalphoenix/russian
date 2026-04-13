@@ -1043,14 +1043,17 @@ function submitAnswer(choice) {
   if (correct) {
     stats.correct += 1;
     stats.streak += 1;
-    stats.dueAt = state.turn + 4 + Math.min(4, stats.streak);
+    const interval = typeof srsNextInterval === "function"
+      ? srsNextInterval(stats, null, true)
+      : 4 + Math.min(4, stats.streak);
+    stats.dueAt = state.turn + interval;
     state.totalCorrect += 1;
     state.streak += 1;
     state.formStats[answer].correct += 1;
   } else {
     stats.wrong += 1;
     stats.streak = 0;
-    stats.dueAt = state.turn + 2;
+    stats.dueAt = state.turn + (typeof srsNextInterval === "function" ? srsNextInterval(stats, null, false) : 2);
     state.streak = 0;
     state.formStats[answer].wrong += 1;
   }

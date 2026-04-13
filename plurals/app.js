@@ -1323,10 +1323,15 @@ function submitAnswer(choice) {
       state.totalFastCorrect += 1;
     }
 
-    stats.dueAt = state.turn + 4 + Math.min(4, stats.correct);
+    const interval = typeof srsNextInterval === "function"
+      ? srsNextInterval(stats, responseMs, true, { speedTargetMs: speedTargetForItem(item) })
+      : 4 + Math.min(4, stats.correct);
+    stats.dueAt = state.turn + interval;
   } else {
     stats.wrong += 1;
-    stats.dueAt = state.turn + 2;
+    stats.dueAt = state.turn + (typeof srsNextInterval === "function"
+      ? srsNextInterval(stats, responseMs, false)
+      : 2);
   }
 
   state.turn += 1;
