@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=PT+Serif:wght@400;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;700&family=Space+Grotesk:wght@400;500;700&display=swap");
 
 :root {
   --bg-cream: #fff7ef;
@@ -35,7 +35,7 @@ body {
 
 body {
   margin: 0;
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: "Space Grotesk", sans-serif;
   color: var(--ink);
   background:
     radial-gradient(circle at top left, rgba(244, 109, 82, 0.18), transparent 32%),
@@ -196,7 +196,7 @@ h1,
 h2,
 h3 {
   margin: 0;
-  font-family: "PT Serif", "Georgia", serif;
+  font-family: "Literata", serif;
   letter-spacing: -0.03em;
 }
 
@@ -566,7 +566,7 @@ h3 {
   font-size: clamp(1.4rem, 3vw, 2rem);
   line-height: 1.4;
   min-height: 4.4rem;
-  font-family: "PT Serif", "Georgia", serif;
+  font-family: "Literata", serif;
 }
 
 .sentence-display .token-highlight {
@@ -770,7 +770,7 @@ h3 {
   background: rgba(255, 255, 255, 0.72);
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: "PT Serif", "Georgia", serif;
+  font-family: "Literata", serif;
   font-size: 1.05rem;
   line-height: 1.6;
 }
@@ -962,7 +962,7 @@ h3 {
   margin: 0;
   font-size: 1rem;
   line-height: 1.4;
-  font-family: "PT Serif", "Georgia", serif;
+  font-family: "Literata", serif;
 }
 
 .bank-score-pill {

@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;700&family=Space+Grotesk:wght@400;500;700&display=swap");
 
 :root {
   --bg: #f5efe2;
@@ -37,7 +37,7 @@ body {
 body {
   margin: 0;
   color: var(--ink);
-  font-family: "Manrope", system-ui, sans-serif;
+  font-family: "Space Grotesk", sans-serif;
   background:
     radial-gradient(circle at top left, rgba(181, 92, 56, 0.18), transparent 26%),
     radial-gradient(circle at top right, rgba(31, 108, 103, 0.14), transparent 28%),
@@ -228,7 +228,7 @@ h3 {
 }
 
 h1 {
-  font-family: "Fraunces", "Georgia", serif;
+  font-family: "Literata", serif;
   font-size: clamp(1.58rem, 6.4vw, 2rem);
   line-height: 0.98;
 }
