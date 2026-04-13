@@ -1191,12 +1191,67 @@ function renderPatternGrid() {
     .join("");
 }
 
+function analyzeErrorPatterns() {
+  const patterns = [];
+  const familyErrors = {};
+  const stepErrors = {};
+
+  for (const item of items) {
+    const stats = ensureItemStats(item.id);
+    if (stats.wrong >= 2) {
+      familyErrors[item.family] = (familyErrors[item.family] || 0) + stats.wrong;
+      stepErrors[item.step] = (stepErrors[item.step] || 0) + stats.wrong;
+    }
+  }
+
+  const worstFamily = Object.entries(familyErrors).sort((a, b) => b[1] - a[1])[0];
+  if (worstFamily && worstFamily[1] >= 3) {
+    const familyLabels = {
+      regular_masc_consonant: "masculine consonant-ending nouns (-ы)",
+      regular_fem_a: "feminine -а nouns (-ы)",
+      regular_fem_ya: "feminine -я nouns (-и)",
+      regular_masc_soft: "soft-sign masculine nouns (-и)",
+      regular_fem_soft: "soft-sign feminine nouns (-и)",
+      spelling_rule: "spelling-rule nouns (к/г/х/ж/ш/щ/ч + и)",
+      stress_shift: "stress-shifting nouns",
+      fleeting_vowel: "fleeting-vowel nouns",
+      a_plural: "nouns with -а/-я plurals",
+      irregular: "irregular plurals",
+    };
+    const label = familyLabels[worstFamily[0]] || worstFamily[0];
+    patterns.push(`Most errors on ${label}. Review the ending rule for this group.`);
+  }
+
+  const stepTotals = {};
+  for (const item of items) {
+    const stats = ensureItemStats(item.id);
+    if (!stepTotals[item.step]) stepTotals[item.step] = { correct: 0, wrong: 0 };
+    stepTotals[item.step].correct += stats.correct;
+    stepTotals[item.step].wrong += stats.wrong;
+  }
+
+  for (const [step, totals] of Object.entries(stepTotals)) {
+    const total = totals.correct + totals.wrong;
+    if (total >= 5 && totals.wrong / total > 0.4) {
+      const stepLabel = { regular: "regular", tricky: "tricky shift", irregular: "irregular" }[step] || step;
+      patterns.push(`${stepLabel.charAt(0).toUpperCase() + stepLabel.slice(1)} plurals have a high error rate. Slow down on these.`);
+    }
+  }
+
+  return patterns;
+}
+
 function renderWeakList() {
   const weakest = [...items]
     .sort((a, b) => itemMastery(a) - itemMastery(b))
     .slice(0, 4);
 
-  el.weakList.innerHTML = weakest
+  const patterns = analyzeErrorPatterns();
+  const patternHtml = patterns.length
+    ? `<div class="error-patterns"><p class="pattern-insight">${patterns[0]}</p></div>`
+    : "";
+
+  el.weakList.innerHTML = patternHtml + weakest
     .map((item) => {
       const stats = ensureItemStats(item.id);
       const avg = avgCorrectMsForStats(stats);

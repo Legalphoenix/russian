@@ -939,12 +939,48 @@ function renderMastery() {
     .join("");
 }
 
+function analyzeErrorPatterns() {
+  const patterns = [];
+  const pastForms = allForms.filter((f) => formMeta[f].lane === "past");
+  const futureForms = allForms.filter((f) => formMeta[f].lane === "future");
+  const pastWrong = pastForms.reduce((sum, f) => sum + state.formStats[f].wrong, 0);
+  const futureWrong = futureForms.reduce((sum, f) => sum + state.formStats[f].wrong, 0);
+  const pastTotal = pastForms.reduce((sum, f) => sum + state.formStats[f].correct + state.formStats[f].wrong, 0);
+  const futureTotal = futureForms.reduce((sum, f) => sum + state.formStats[f].correct + state.formStats[f].wrong, 0);
+
+  if (pastTotal >= 4 && pastWrong / pastTotal > 0.35) {
+    patterns.push("Past tense forms are unreliable. Focus on the gender/number of the subject.");
+  }
+  if (futureTotal >= 4 && futureWrong / futureTotal > 0.35) {
+    patterns.push("Future tense forms need work. Match the person of the subject.");
+  }
+
+  const genderForms = ["был", "была", "было"];
+  const genderMisses = genderForms.filter((f) => state.formStats[f].wrong >= 2 && formMastery(f) < 0.6);
+  if (genderMisses.length >= 2) {
+    patterns.push("Gender confusion: you mix up masculine/feminine/neuter in past tense. Look for the subject noun's gender.");
+  }
+
+  const personForms = ["будешь", "будет", "будете", "будут"];
+  const personMisses = personForms.filter((f) => state.formStats[f].wrong >= 2 && formMastery(f) < 0.6);
+  if (personMisses.length >= 2) {
+    patterns.push("Person confusion in future: check whether the subject is ты/он/вы/они before choosing.");
+  }
+
+  return patterns;
+}
+
 function renderWeakSpots() {
   const weakest = [...allForms]
     .sort((a, b) => formMastery(a) - formMastery(b))
     .slice(0, 3);
 
-  el.weakSpotList.innerHTML = weakest
+  const patterns = analyzeErrorPatterns();
+  const patternHtml = patterns.length
+    ? `<div class="error-patterns"><p class="pattern-insight">${patterns[0]}</p></div>`
+    : "";
+
+  el.weakSpotList.innerHTML = patternHtml + weakest
     .map((form) => `
       <article class="weak-spot-item">
         <strong>${form}</strong>

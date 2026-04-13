@@ -952,3 +952,21 @@ select {
 .typing-input:disabled {
   opacity: 0.5;
 }
+
+
+/* ─── Error pattern insight ──────────────────────────────── */
+
+.error-patterns {
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(191, 92, 57, 0.08);
+  border-left: 3px solid var(--accent, #bf5c39);
+}
+
+.pattern-insight {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--ink);
+}
