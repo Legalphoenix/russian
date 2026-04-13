@@ -8,6 +8,18 @@
   --family-their: #285f70;
 }
 
+.page-nav-link.nav-launcher {
+  background: transparent;
+  color: var(--accent, #bf5c39);
+  font-weight: 600;
+  border: 1px solid var(--accent, #bf5c39);
+}
+
+.page-nav-link.nav-launcher:hover {
+  background: var(--accent, #bf5c39);
+  color: #fff;
+}
+
 body.possessives-page {
   background:
     radial-gradient(circle at top left, rgba(79, 138, 58, 0.14), transparent 26%),

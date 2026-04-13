@@ -176,6 +176,18 @@ button {
   transform: translateY(-1px);
 }
 
+.page-nav-link.nav-launcher {
+  background: transparent;
+  color: var(--accent);
+  font-weight: 600;
+  border: 1px solid var(--accent);
+}
+
+.page-nav-link.nav-launcher:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 .page-nav-link.is-current {
   background: var(--ink);
   color: #fff;

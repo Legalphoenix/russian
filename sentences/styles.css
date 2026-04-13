@@ -152,6 +152,18 @@ textarea {
   transform: translateY(-1px);
 }
 
+.page-nav-link.nav-launcher {
+  background: transparent;
+  color: var(--coral);
+  font-weight: 600;
+  border: 1px solid var(--coral);
+}
+
+.page-nav-link.nav-launcher:hover {
+  background: var(--coral);
+  color: #fff;
+}
+
 .page-nav-link.is-current {
   background: var(--ink);
   color: #ffffff;
