@@ -1677,6 +1677,16 @@ function bindEvents() {
   refs.modeSingleButton.addEventListener("click", () => setMode("single"));
   refs.modeBatchButton.addEventListener("click", () => setMode("batch"));
   refs.batchInput.addEventListener("input", refreshBatchCount);
+  refs.batchInput.addEventListener("keydown", (event) => {
+    if (event.key !== "Tab" || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
+    event.preventDefault();
+    const el = refs.batchInput;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    el.value = el.value.slice(0, start) + "\t" + el.value.slice(end);
+    el.selectionStart = el.selectionEnd = start + 1;
+    refreshBatchCount();
+  });
   refs.batchSaveButton.addEventListener("click", () => saveBatchPhrases());
   refs.batchClearButton.addEventListener("click", () => {
     refs.batchInput.value = "";
