@@ -53,6 +53,7 @@ const state = {
   drillActive: false,
   drillToken: 0,
   drillPlayingPhraseId: "",
+  drillGroupId: "",
   drillExcluded: new Set(),
 };
 
@@ -280,11 +281,16 @@ function renderGroupChips() {
   ];
   for (const group of groups) {
     const isActive = state.activeGroupId === group.id ? " is-active" : "";
+    const isDrilling = state.drillActive && state.drillGroupId === group.id;
+    const drillClass = isDrilling ? " is-drilling" : "";
+    const drillIcon = isDrilling ? "⏹" : "▶";
+    const drillLabel = isDrilling ? `Stop drill on ${group.name}` : `Start drill on ${group.name}`;
+    const drillTitle = isDrilling ? "Stop drill" : "Start drill";
     chips.push(
       `<button class="group-chip${isActive}" type="button" data-group-filter="${escapeHtml(group.id)}" title="${escapeHtml(group.name)}">
          <span class="group-chip-name">${escapeHtml(group.name)}</span>
          <span class="group-chip-count">${group.phraseIds.length}</span>
-         <span class="group-chip-drill" data-group-drill="${escapeHtml(group.id)}" role="button" aria-label="Start drill on ${escapeHtml(group.name)}" title="Start drill">▶</span>
+         <span class="group-chip-drill${drillClass}" data-group-drill="${escapeHtml(group.id)}" role="button" aria-label="${escapeHtml(drillLabel)}" title="${drillTitle}">${drillIcon}</span>
        </button>`
     );
   }
@@ -851,7 +857,14 @@ async function generateCurrentPhrase({ silent = false } = {}) {
     });
     state.variants = response.variants || [];
     renderVariants();
-    if (!silent) setNotice("success", `${state.variants.length} voice variants ready.`);
+    pulsePack();
+    if (!silent && !state.loadedPhraseId && state.variants.length) {
+      try {
+        await saveCurrentPhrase({ mode: "new", successMessageOverride: `✓ Voice pack ready — saved to "${deck.name}".` });
+      } catch {}
+    } else if (!silent) {
+      setNotice("success", `✓ ${state.variants.length} voice variants ready.`);
+    }
   } catch (error) {
     setNotice("error", error.message);
   } finally {
@@ -860,7 +873,16 @@ async function generateCurrentPhrase({ silent = false } = {}) {
   }
 }
 
-async function saveCurrentPhrase({ mode = "new" } = {}) {
+function pulsePack() {
+  const pack = refs.variantList?.closest(".pack");
+  if (!pack) return;
+  pack.classList.remove("is-just-generated");
+  void pack.offsetWidth;
+  pack.classList.add("is-just-generated");
+  setTimeout(() => pack.classList.remove("is-just-generated"), 1500);
+}
+
+async function saveCurrentPhrase({ mode = "new", successMessageOverride = "" } = {}) {
   const deck = getActiveDeck();
   if (!deck) {
     setNotice("warning", "Create a deck first.");
@@ -906,7 +928,7 @@ async function saveCurrentPhrase({ mode = "new" } = {}) {
     upsertPhrase(savedPhrase);
     renderLibrary();
     syncComposerMeta();
-    setNotice("success", successMessage);
+    setNotice("success", successMessageOverride || successMessage);
   } catch (error) {
     setNotice("error", error.message);
   } finally {
@@ -1201,6 +1223,7 @@ function stopDrill() {
   state.drillToken += 1;
   state.drillActive = false;
   state.drillPlayingPhraseId = "";
+  state.drillGroupId = "";
   refs.drillAudio.pause();
   refs.drillAudio.removeAttribute("src");
   setDrillStatus("");
@@ -1295,6 +1318,7 @@ function startDrillOnCurrentView() {
   const deck = getActiveDeck();
   const group = deck?.groups.find((g) => g.id === state.activeGroupId);
   const phrases = getDrillPhrasesForCurrentView();
+  state.drillGroupId = group ? group.id : "";
   startDrillWithPhrases(phrases, group ? group.name : null);
 }
 
@@ -1304,7 +1328,18 @@ function startDrillOnGroup(groupId) {
   if (!group) return;
   const phraseById = new Map(deck.phrases.map((p) => [p.id, p]));
   const phrases = group.phraseIds.map((id) => phraseById.get(id)).filter(Boolean);
+  state.drillGroupId = group.id;
   startDrillWithPhrases(phrases, group.name);
+}
+
+function toggleGroupDrill(groupId) {
+  if (state.drillActive && state.drillGroupId === groupId) {
+    stopDrill();
+    setNotice("info", "Drill stopped.");
+  } else {
+    if (state.drillActive) stopDrill();
+    startDrillOnGroup(groupId);
+  }
 }
 
 // ───── decks ─────
@@ -1666,7 +1701,6 @@ function openManageGroupsModal() {
           <div class="inline-actions">
             <button class="mini-button" type="button" data-manage-action="rename" data-group-id="${escapeHtml(g.id)}">Rename</button>
             <button class="mini-button" type="button" data-manage-action="copy" data-group-id="${escapeHtml(g.id)}">Copy to…</button>
-            <button class="mini-button" type="button" data-manage-action="drill" data-group-id="${escapeHtml(g.id)}">Drill</button>
             <button class="mini-button is-danger" type="button" data-manage-action="delete" data-group-id="${escapeHtml(g.id)}">Delete</button>
           </div>
         </div>
@@ -1881,7 +1915,7 @@ function bindEvents() {
     const drill = event.target.closest("[data-group-drill]");
     if (drill) {
       event.stopPropagation();
-      startDrillOnGroup(drill.dataset.groupDrill);
+      toggleGroupDrill(drill.dataset.groupDrill);
       return;
     }
     const chip = event.target.closest("[data-group-filter]");
