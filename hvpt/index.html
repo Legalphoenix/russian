@@ -232,17 +232,15 @@
         <div class="group-bar">
           <div id="group-chips" class="group-chips" aria-label="Groups"></div>
           <div class="inline-actions">
+            <button id="shuffle-toggle-button" class="mini-button shuffle-toggle" type="button" aria-pressed="false" title="Shuffle drill order">Shuffle</button>
             <button id="group-new-button" class="mini-button" type="button">+ New group</button>
             <button id="group-manage-button" class="mini-button" type="button" hidden>Manage</button>
           </div>
         </div>
 
-        <div class="drill-toolbar">
-          <button id="drill-start-button" class="primary-button" type="button">▶ Start drill</button>
-          <button id="drill-stop-button" class="ghost-button" type="button" hidden>Stop drill</button>
-        </div>
         <div id="drill-status" class="drill-status"></div>
         <audio id="drill-audio" preload="auto" style="display:none"></audio>
+        <audio id="preview-audio" preload="auto" style="display:none"></audio>
 
         <div id="library-list" class="library-list"></div>
       </section>

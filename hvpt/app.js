@@ -55,6 +55,8 @@ const state = {
   drillPlayingPhraseId: "",
   drillGroupId: "",
   drillExcluded: new Set(),
+  drillShuffle: false,
+  previewPhraseId: "",
 };
 
 const refs = {
@@ -84,10 +86,10 @@ const refs = {
   libraryCount: document.getElementById("library-count"),
   libraryList: document.getElementById("library-list"),
   recordButton: document.getElementById("record-button"),
-  drillStartButton: document.getElementById("drill-start-button"),
-  drillStopButton: document.getElementById("drill-stop-button"),
+  shuffleToggleButton: document.getElementById("shuffle-toggle-button"),
   drillStatus: document.getElementById("drill-status"),
   drillAudio: document.getElementById("drill-audio"),
+  previewAudio: document.getElementById("preview-audio"),
   deckSelect: document.getElementById("deck-select"),
   deckMenuButton: document.getElementById("deck-menu-button"),
   deckMenu: document.getElementById("deck-menu"),
@@ -576,8 +578,8 @@ function renderLibrary() {
             <button class="group-badge group-badge-add" type="button" data-action="open-group-popover" data-phrase-id="${escapeHtml(phrase.id)}" title="Add to a group">+ Group</button>
           </div>
           <div class="library-actions">
+            <button class="mini-button play-phrase-button ${state.previewPhraseId === phrase.id ? "is-playing" : ""}" type="button" data-action="preview" data-phrase-id="${escapeHtml(phrase.id)}" title="${state.previewPhraseId === phrase.id ? "Stop" : "Play this phrase"}" aria-label="${state.previewPhraseId === phrase.id ? "Stop preview" : "Play preview"}">${state.previewPhraseId === phrase.id ? "⏹" : "▶"}</button>
             <button class="mini-button" type="button" data-action="load" data-phrase-id="${escapeHtml(phrase.id)}">Load</button>
-            <button class="mini-button" type="button" data-action="practice" data-phrase-id="${escapeHtml(phrase.id)}">Practice</button>
             <button class="mini-button is-danger" type="button" data-action="delete" data-phrase-id="${escapeHtml(phrase.id)}">Delete</button>
           </div>
         </article>
@@ -1191,22 +1193,75 @@ function stopRecording() {
   }
 }
 
+// ───── single-phrase preview ─────
+
+function stopPreview() {
+  if (refs.previewAudio) {
+    refs.previewAudio.pause();
+    refs.previewAudio.removeAttribute("src");
+  }
+  if (state.previewPhraseId) {
+    state.previewPhraseId = "";
+    renderLibrary();
+  }
+}
+
+async function togglePhrasePreview(phraseId) {
+  if (state.previewPhraseId === phraseId) {
+    stopPreview();
+    return;
+  }
+  stopPreview();
+  if (state.drillActive) stopDrill();
+  stopCycle();
+
+  const deck = getActiveDeck();
+  const phrase = deck?.phrases.find((p) => p.id === phraseId);
+  if (!phrase) return;
+
+  const voicePool = phrase.voices?.length ? phrase.voices : state.defaultVoices;
+  if (!voicePool.length) {
+    setNotice("warning", "No voice available for this phrase.");
+    return;
+  }
+  const voice = voicePool[Math.floor(Math.random() * voicePool.length)];
+
+  state.previewPhraseId = phraseId;
+  renderLibrary();
+
+  try {
+    const response = await fetchJson(`${API_BASE}/generate`, {
+      method: "POST",
+      body: JSON.stringify({
+        text: phrase.text,
+        note: phrase.note || "",
+        instructions: phrase.instructions || "",
+        speed: phrase.speed || 1,
+        voices: [voice],
+      }),
+    });
+    const url = response.variants?.[0]?.url;
+    if (!url || state.previewPhraseId !== phraseId) return;
+    const audio = refs.previewAudio;
+    audio.src = url;
+    audio.onended = () => {
+      if (state.previewPhraseId === phraseId) stopPreview();
+    };
+    await audio.play();
+  } catch (error) {
+    setNotice("error", error.message);
+    stopPreview();
+  }
+}
+
 // ───── drill ─────
 
 function syncDrillUI() {
-  const toDrill = getDrillPhrasesForCurrentView();
-  refs.drillStartButton.disabled = toDrill.length === 0 || state.drillActive;
-  refs.drillStopButton.hidden = !state.drillActive;
-  refs.drillStartButton.hidden = state.drillActive;
-
-  const deck = getActiveDeck();
-  const group = deck?.groups.find((g) => g.id === state.activeGroupId);
-  const filtered = getFilteredPhrases();
-  const excludedCount = state.activeGroupId ? filtered.length - toDrill.length : 0;
-  const suffix = excludedCount > 0 ? ` of ${filtered.length}` : "";
-  refs.drillStartButton.textContent = group
-    ? `▶ Drill "${group.name}" (${toDrill.length}${suffix})`
-    : `▶ Start drill (${toDrill.length})`;
+  renderGroupChips();
+  if (refs.shuffleToggleButton) {
+    refs.shuffleToggleButton.classList.toggle("is-active", state.drillShuffle);
+    refs.shuffleToggleButton.setAttribute("aria-pressed", String(state.drillShuffle));
+  }
 }
 
 function setDrillStatus(message) {
@@ -1247,7 +1302,7 @@ async function startDrillWithPhrases(phrases, label) {
 
   try {
     while (state.drillActive && token === state.drillToken) {
-      const phraseOrder = shuffle(phrases);
+      const phraseOrder = state.drillShuffle ? shuffle(phrases) : phrases.slice();
       for (const phrase of phraseOrder) {
         if (token !== state.drillToken) return;
 
@@ -1314,20 +1369,15 @@ async function startDrillWithPhrases(phrases, label) {
   }
 }
 
-function startDrillOnCurrentView() {
-  const deck = getActiveDeck();
-  const group = deck?.groups.find((g) => g.id === state.activeGroupId);
-  const phrases = getDrillPhrasesForCurrentView();
-  state.drillGroupId = group ? group.id : "";
-  startDrillWithPhrases(phrases, group ? group.name : null);
-}
-
 function startDrillOnGroup(groupId) {
   const deck = getActiveDeck();
   const group = deck?.groups.find((g) => g.id === groupId);
   if (!group) return;
   const phraseById = new Map(deck.phrases.map((p) => [p.id, p]));
-  const phrases = group.phraseIds.map((id) => phraseById.get(id)).filter(Boolean);
+  const allInGroup = group.phraseIds.map((id) => phraseById.get(id)).filter(Boolean);
+  const phrases = state.activeGroupId === groupId
+    ? allInGroup.filter((p) => !state.drillExcluded.has(p.id))
+    : allInGroup;
   state.drillGroupId = group.id;
   startDrillWithPhrases(phrases, group.name);
 }
@@ -1336,10 +1386,15 @@ function toggleGroupDrill(groupId) {
   if (state.drillActive && state.drillGroupId === groupId) {
     stopDrill();
     setNotice("info", "Drill stopped.");
-  } else {
-    if (state.drillActive) stopDrill();
-    startDrillOnGroup(groupId);
+    return;
   }
+  if (state.drillActive) stopDrill();
+  stopPreview();
+  if (state.activeGroupId !== groupId) {
+    setActiveGroup(groupId);
+  }
+  renderLibrary();
+  startDrillOnGroup(groupId);
 }
 
 // ───── decks ─────
@@ -1810,8 +1865,8 @@ function bindEvents() {
     if (!button) return;
     const phraseId = button.dataset.phraseId;
     const action = button.dataset.action;
-    if (action === "load") loadPhrase(phraseId);
-    else if (action === "practice") loadPhrase(phraseId, { practice: true });
+    if (action === "load") loadPhrase(phraseId, { practice: true });
+    else if (action === "preview") togglePhrasePreview(phraseId);
     else if (action === "delete") deletePhrase(phraseId);
     else if (action === "drill-select-all") {
       state.drillExcluded = new Set();
@@ -1855,10 +1910,10 @@ function bindEvents() {
     togglePhraseInGroup(checkbox.dataset.phraseId, checkbox.dataset.groupId);
   });
 
-  refs.drillStartButton.addEventListener("click", () => startDrillOnCurrentView());
-  refs.drillStopButton.addEventListener("click", () => {
-    stopDrill();
-    setNotice("info", "Drill stopped.");
+  refs.shuffleToggleButton.addEventListener("click", () => {
+    state.drillShuffle = !state.drillShuffle;
+    syncDrillUI();
+    setNotice("info", state.drillShuffle ? "Shuffle on — order randomized each cycle." : "Shuffle off — phrases play in saved order.");
   });
 
   // Deck switcher.

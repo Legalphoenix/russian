@@ -513,6 +513,10 @@ h3 {
   padding: 0.55rem 0.82rem;
 }
 
+.mini-button {
+  white-space: nowrap;
+}
+
 .ghost-button,
 .primary-button {
   min-height: 44px;
@@ -1159,13 +1163,6 @@ button:disabled {
 
 /* ── Drill mode ── */
 
-.drill-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
 .drill-status {
   display: none;
   margin-bottom: 10px;
@@ -1209,6 +1206,27 @@ button:disabled {
   height: 16px;
   accent-color: var(--ink);
   cursor: pointer;
+}
+
+.shuffle-toggle.is-active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+.play-phrase-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.8rem;
+}
+
+.play-phrase-button.is-playing {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
 }
 
 .drill-select-toolbar {
