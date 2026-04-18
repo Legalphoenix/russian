@@ -53,6 +53,7 @@ const state = {
   drillActive: false,
   drillToken: 0,
   drillPlayingPhraseId: "",
+  drillExcluded: new Set(),
 };
 
 const refs = {
@@ -77,6 +78,7 @@ const refs = {
   cycleButton: document.getElementById("cycle-button"),
   shuffleButton: document.getElementById("shuffle-button"),
   stopButton: document.getElementById("stop-button"),
+  unloadPackButton: document.getElementById("unload-pack-button"),
   variantList: document.getElementById("variant-list"),
   libraryCount: document.getElementById("library-count"),
   libraryList: document.getElementById("library-list"),
@@ -171,6 +173,12 @@ function getFilteredPhrases() {
   if (!group) return phrases;
   const phraseById = new Map(phrases.map((p) => [p.id, p]));
   return group.phraseIds.map((id) => phraseById.get(id)).filter(Boolean);
+}
+
+function getDrillPhrasesForCurrentView() {
+  const filtered = getFilteredPhrases();
+  if (!state.activeGroupId) return filtered;
+  return filtered.filter((p) => !state.drillExcluded.has(p.id));
 }
 
 function normalizeDraft(candidate) {
@@ -308,6 +316,7 @@ function syncComposerMeta() {
   refs.cycleButton.disabled = !variantReady || state.isGenerating;
   refs.shuffleButton.disabled = !variantReady || state.isGenerating;
   refs.stopButton.disabled = !variantReady;
+  if (refs.unloadPackButton) refs.unloadPackButton.disabled = !variantReady && !hasLoadedPhrase;
 }
 
 function collectPhrasePayload({ allowMissingVoices = false } = {}) {
@@ -400,7 +409,12 @@ function removeGroupLocal(groupId) {
   const deck = getActiveDeck();
   if (!deck) return;
   deck.groups = deck.groups.filter((g) => g.id !== groupId);
-  if (state.activeGroupId === groupId) state.activeGroupId = "";
+  if (state.activeGroupId === groupId) setActiveGroup("");
+}
+
+function setActiveGroup(groupId) {
+  state.activeGroupId = groupId;
+  state.drillExcluded = new Set();
 }
 
 // ───── variants ─────
@@ -503,11 +517,27 @@ function renderLibrary() {
   }
 
   const groupLookup = new Map(deckGroups.map((g) => [g.id, g]));
+  const inGroupView = Boolean(state.activeGroupId);
 
-  refs.libraryList.innerHTML = filteredPhrases
+  let toolbarHtml = "";
+  if (inGroupView) {
+    const includedCount = filteredPhrases.filter((p) => !state.drillExcluded.has(p.id)).length;
+    toolbarHtml = `
+      <div class="drill-select-toolbar">
+        <span class="subpanel-note">${includedCount} of ${filteredPhrases.length} selected for drill</span>
+        <div class="inline-actions">
+          <button class="mini-button" type="button" data-action="drill-select-all">Select all</button>
+          <button class="mini-button" type="button" data-action="drill-clear-all">Clear</button>
+        </div>
+      </div>
+    `;
+  }
+
+  refs.libraryList.innerHTML = toolbarHtml + filteredPhrases
     .map((phrase) => {
       const isActive = phrase.id === state.loadedPhraseId;
       const isDrillPlaying = state.drillPlayingPhraseId === phrase.id;
+      const isExcluded = inGroupView && state.drillExcluded.has(phrase.id);
       const note = phrase.note ? `<p class="library-note">${escapeHtml(phrase.note)}</p>` : "";
       const instructionNote = phrase.instructions ? "voice direction saved" : "plain delivery";
       const badges = deckGroups
@@ -517,10 +547,17 @@ function renderLibrary() {
             `<button class="group-badge" type="button" data-action="toggle-group" data-phrase-id="${escapeHtml(phrase.id)}" data-group-id="${escapeHtml(g.id)}" title="Remove from ${escapeHtml(g.name)}">${escapeHtml(g.name)} ×</button>`
         )
         .join("");
+      const drillToggle = inGroupView
+        ? `<label class="drill-include-toggle" title="${isExcluded ? "Include in drill" : "Exclude from drill"}">
+             <input type="checkbox" data-action="toggle-drill-include" data-phrase-id="${escapeHtml(phrase.id)}" ${isExcluded ? "" : "checked"} />
+             <span class="sr-only">Include in drill</span>
+           </label>`
+        : "";
       return `
-        <article class="library-card ${isActive ? "is-active" : ""} ${isDrillPlaying ? "is-drill-playing" : ""}" data-phrase-id="${escapeHtml(phrase.id)}">
+        <article class="library-card ${isActive ? "is-active" : ""} ${isDrillPlaying ? "is-drill-playing" : ""} ${isExcluded ? "is-drill-excluded" : ""}" data-phrase-id="${escapeHtml(phrase.id)}">
           <div class="library-top">
             <div class="library-top-left">
+              ${drillToggle}
               <span class="library-tag">${phrase.voices.length} voice${phrase.voices.length === 1 ? "" : "s"}</span>
             </div>
             <span class="library-date">${formatDate(phrase.updatedAt)}</span>
@@ -580,6 +617,18 @@ function populateComposer(phrase) {
   renderVariants();
   renderLibrary();
   syncComposerMeta();
+}
+
+function unloadPack() {
+  stopCycle();
+  state.variants = [];
+  state.playingVariantId = "";
+  clearUserRecording();
+  setLoadedPhrase(null);
+  renderVariants();
+  renderLibrary();
+  syncComposerMeta();
+  setNotice("info", "Practice pack cleared.");
 }
 
 function clearComposer({ keepPreset = true } = {}) {
@@ -1123,16 +1172,19 @@ function stopRecording() {
 // ───── drill ─────
 
 function syncDrillUI() {
-  const filtered = getFilteredPhrases();
-  refs.drillStartButton.disabled = filtered.length === 0 || state.drillActive;
+  const toDrill = getDrillPhrasesForCurrentView();
+  refs.drillStartButton.disabled = toDrill.length === 0 || state.drillActive;
   refs.drillStopButton.hidden = !state.drillActive;
   refs.drillStartButton.hidden = state.drillActive;
 
   const deck = getActiveDeck();
   const group = deck?.groups.find((g) => g.id === state.activeGroupId);
+  const filtered = getFilteredPhrases();
+  const excludedCount = state.activeGroupId ? filtered.length - toDrill.length : 0;
+  const suffix = excludedCount > 0 ? ` of ${filtered.length}` : "";
   refs.drillStartButton.textContent = group
-    ? `▶ Drill "${group.name}" (${filtered.length})`
-    : `▶ Start drill (${filtered.length})`;
+    ? `▶ Drill "${group.name}" (${toDrill.length}${suffix})`
+    : `▶ Start drill (${toDrill.length})`;
 }
 
 function setDrillStatus(message) {
@@ -1242,7 +1294,7 @@ async function startDrillWithPhrases(phrases, label) {
 function startDrillOnCurrentView() {
   const deck = getActiveDeck();
   const group = deck?.groups.find((g) => g.id === state.activeGroupId);
-  const phrases = getFilteredPhrases();
+  const phrases = getDrillPhrasesForCurrentView();
   startDrillWithPhrases(phrases, group ? group.name : null);
 }
 
@@ -1267,7 +1319,7 @@ async function createDeck() {
     });
     state.decks.push(response.deck);
     state.activeDeckId = response.deck.id;
-    state.activeGroupId = "";
+    setActiveGroup("");
     persistDeckSelection();
     setNotice("success", `Deck "${response.deck.name}" created.`);
     clearComposer();
@@ -1307,7 +1359,7 @@ async function deleteDeck() {
     await fetchJson(`${API_BASE}/decks/${deck.id}`, { method: "DELETE" });
     state.decks = state.decks.filter((d) => d.id !== deck.id);
     state.activeDeckId = state.decks[0]?.id || "";
-    state.activeGroupId = "";
+    setActiveGroup("");
     persistDeckSelection();
     clearComposer();
     renderLibrary();
@@ -1320,7 +1372,7 @@ async function deleteDeck() {
 function switchDeck(deckId) {
   if (!state.decks.find((d) => d.id === deckId)) return;
   state.activeDeckId = deckId;
-  state.activeGroupId = "";
+  setActiveGroup("");
   persistDeckSelection();
   clearComposer();
   renderLibrary();
@@ -1387,6 +1439,112 @@ async function renameGroup(groupId) {
   } catch (error) {
     setNotice("error", error.message);
   }
+}
+
+async function mergeGroupPhraseIds(targetGroupId, phraseIdsToAdd) {
+  const deck = getActiveDeck();
+  if (!deck) return null;
+  const target = deck.groups.find((g) => g.id === targetGroupId);
+  if (!target) return null;
+  const seen = new Set(target.phraseIds);
+  const merged = [...target.phraseIds];
+  let added = 0;
+  for (const pid of phraseIdsToAdd) {
+    if (seen.has(pid)) continue;
+    seen.add(pid);
+    merged.push(pid);
+    added += 1;
+  }
+  const response = await fetchJson(`${API_BASE}/decks/${deck.id}/groups/${targetGroupId}`, {
+    method: "PUT",
+    body: JSON.stringify({ name: target.name, phraseIds: merged }),
+  });
+  upsertGroup(response.group);
+  return { group: response.group, added };
+}
+
+async function copyGroupIntoAnother(sourceGroupId) {
+  const deck = getActiveDeck();
+  if (!deck) return;
+  const source = deck.groups.find((g) => g.id === sourceGroupId);
+  if (!source) return;
+  if (!source.phraseIds.length) {
+    setNotice("warning", `"${source.name}" has no phrases to copy.`);
+    return;
+  }
+  const others = deck.groups.filter((g) => g.id !== sourceGroupId);
+
+  const container = document.createElement("div");
+  const optionsHtml = others
+    .map((g) => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)} (${g.phraseIds.length})</option>`)
+    .join("");
+  container.innerHTML = `
+    <p class="subpanel-note">Adds all ${source.phraseIds.length} phrase${source.phraseIds.length === 1 ? "" : "s"} from
+      <strong>${escapeHtml(source.name)}</strong> into the target group. Duplicates are skipped.</p>
+    <label class="field">
+      <span class="field-label">Target group</span>
+      <select id="copy-target-select" class="text-input">
+        ${optionsHtml}
+        <option value="__new__">— Create new group —</option>
+      </select>
+    </label>
+    <label class="field" id="copy-new-name-field" hidden>
+      <span class="field-label">New group name</span>
+      <input id="copy-new-name-input" class="text-input" type="text" placeholder="e.g. Breakfast drills" />
+    </label>
+  `;
+
+  const select = container.querySelector("#copy-target-select");
+  const newField = container.querySelector("#copy-new-name-field");
+  const newInput = container.querySelector("#copy-new-name-input");
+  const syncNewField = () => {
+    const isNew = select.value === "__new__";
+    newField.hidden = !isNew;
+    if (isNew) setTimeout(() => newInput.focus(), 0);
+  };
+  select.addEventListener("change", syncNewField);
+  if (!others.length) select.value = "__new__";
+  syncNewField();
+
+  openModal({
+    title: `Copy "${source.name}" into…`,
+    body: container,
+    actions: [
+      { label: "Cancel", onClick: () => { closeModal(); openManageGroupsModal(); } },
+      {
+        label: "Copy",
+        primary: true,
+        onClick: async () => {
+          const choice = select.value;
+          try {
+            let targetId = choice;
+            if (choice === "__new__") {
+              const name = (newInput.value || "").trim();
+              if (!name) { setNotice("error", "Enter a new group name."); return; }
+              const response = await fetchJson(`${API_BASE}/decks/${deck.id}/groups`, {
+                method: "POST",
+                body: JSON.stringify({ name }),
+              });
+              upsertGroup(response.group);
+              refreshBatchGroupOptions();
+              targetId = response.group.id;
+            }
+            const result = await mergeGroupPhraseIds(targetId, source.phraseIds);
+            if (result) {
+              const skipped = source.phraseIds.length - result.added;
+              const suffix = skipped ? ` (${skipped} already in target)` : "";
+              setNotice("success", `Added ${result.added} phrase${result.added === 1 ? "" : "s"} to "${result.group.name}"${suffix}.`);
+            }
+            renderLibrary();
+            closeModal();
+            openManageGroupsModal();
+          } catch (error) {
+            setNotice("error", error.message);
+          }
+        },
+      },
+    ],
+  });
 }
 
 async function togglePhraseInGroup(phraseId, groupId) {
@@ -1507,6 +1665,7 @@ function openManageGroupsModal() {
           </div>
           <div class="inline-actions">
             <button class="mini-button" type="button" data-manage-action="rename" data-group-id="${escapeHtml(g.id)}">Rename</button>
+            <button class="mini-button" type="button" data-manage-action="copy" data-group-id="${escapeHtml(g.id)}">Copy to…</button>
             <button class="mini-button" type="button" data-manage-action="drill" data-group-id="${escapeHtml(g.id)}">Drill</button>
             <button class="mini-button is-danger" type="button" data-manage-action="delete" data-group-id="${escapeHtml(g.id)}">Delete</button>
           </div>
@@ -1537,6 +1696,9 @@ function openManageGroupsModal() {
     } else if (action === "drill") {
       closeModal();
       startDrillOnGroup(groupId);
+    } else if (action === "copy") {
+      closeModal();
+      await copyGroupIntoAnother(groupId);
     }
   });
 }
@@ -1583,6 +1745,7 @@ function bindEvents() {
     stopCycle();
     setNotice("info", "Playback stopped.");
   });
+  refs.unloadPackButton.addEventListener("click", () => unloadPack());
 
   refs.recordButton.addEventListener("click", () => {
     if (state.isRecording) stopRecording();
@@ -1616,6 +1779,22 @@ function bindEvents() {
     if (action === "load") loadPhrase(phraseId);
     else if (action === "practice") loadPhrase(phraseId, { practice: true });
     else if (action === "delete") deletePhrase(phraseId);
+    else if (action === "drill-select-all") {
+      state.drillExcluded = new Set();
+      renderLibrary();
+    } else if (action === "drill-clear-all") {
+      state.drillExcluded = new Set(getFilteredPhrases().map((p) => p.id));
+      renderLibrary();
+    }
+  });
+
+  refs.libraryList.addEventListener("change", (event) => {
+    const checkbox = event.target.closest('[data-action="toggle-drill-include"]');
+    if (!checkbox) return;
+    const phraseId = checkbox.dataset.phraseId;
+    if (checkbox.checked) state.drillExcluded.delete(phraseId);
+    else state.drillExcluded.add(phraseId);
+    renderLibrary();
   });
 
   document.body.addEventListener("click", (event) => {
@@ -1707,7 +1886,7 @@ function bindEvents() {
     }
     const chip = event.target.closest("[data-group-filter]");
     if (!chip) return;
-    state.activeGroupId = chip.dataset.groupFilter;
+    setActiveGroup(chip.dataset.groupFilter);
     renderLibrary();
   });
   refs.groupNewButton.addEventListener("click", () => createGroup());
@@ -1737,6 +1916,7 @@ async function init() {
   refs.stopButton.disabled = true;
   refs.cycleButton.disabled = true;
   refs.shuffleButton.disabled = true;
+  if (refs.unloadPackButton) refs.unloadPackButton.disabled = true;
 
   try {
     const bootstrap = await fetchJson(`${API_BASE}/bootstrap`);
