@@ -1,9 +1,12 @@
 const API_BASE = "./api";
+const ACTIVE_DECK_KEY = "hvpt:activeDeckId";
+const ACTIVE_GROUP_KEY = "hvpt:activeGroup";
+const DEFAULT_PRESET_LABEL = "Stress contrast";
 
 const INSTRUCTION_PRESETS = [
   {
     label: "Slow & precise",
-    speed: 0.8,
+    speed: 1,
     instructions:
       "Tone: Calm and clear.\nPacing: Slow and deliberate.\nPronunciation: Crisp consonants and clear stress.\nPauses: Small pauses between thought groups.",
   },
@@ -15,13 +18,13 @@ const INSTRUCTION_PRESETS = [
   },
   {
     label: "Brisk conversation",
-    speed: 1.18,
+    speed: 1,
     instructions:
       "Tone: Conversational.\nPacing: Brisk but natural.\nDelivery: Connect words smoothly without sounding rushed.",
   },
   {
     label: "Stress contrast",
-    speed: 0.95,
+    speed: 1,
     instructions:
       "Tone: Focused.\nPacing: Moderate.\nEmphasis: Make the main sentence stress easy to hear.\nPronunciation: Clear vowel reduction and rhythm.",
   },
@@ -30,11 +33,14 @@ const INSTRUCTION_PRESETS = [
 const state = {
   availableVoices: [],
   defaultVoices: [],
-  phrases: [],
+  decks: [],
+  activeDeckId: "",
+  activeGroupId: "", // "" = All
   variants: [],
   loadedPhraseId: "",
   loadedPhraseSnapshot: null,
   formDirty: false,
+  mode: "single", // "single" | "batch"
   playingVariantId: "",
   cycleToken: 0,
   isGenerating: false,
@@ -46,7 +52,6 @@ const state = {
   mediaStream: null,
   drillActive: false,
   drillToken: 0,
-  drillSelectedIds: new Set(),
   drillPlayingPhraseId: "",
 };
 
@@ -78,11 +83,34 @@ const refs = {
   recordButton: document.getElementById("record-button"),
   drillStartButton: document.getElementById("drill-start-button"),
   drillStopButton: document.getElementById("drill-stop-button"),
-  drillSelectAllButton: document.getElementById("drill-select-all-button"),
-  drillClearButton: document.getElementById("drill-clear-button"),
   drillStatus: document.getElementById("drill-status"),
   drillAudio: document.getElementById("drill-audio"),
+  deckSelect: document.getElementById("deck-select"),
+  deckMenuButton: document.getElementById("deck-menu-button"),
+  deckMenu: document.getElementById("deck-menu"),
+  modeSingleButton: document.getElementById("mode-single-button"),
+  modeBatchButton: document.getElementById("mode-batch-button"),
+  singleMode: document.getElementById("single-mode"),
+  batchMode: document.getElementById("batch-mode"),
+  batchInput: document.getElementById("batch-input"),
+  batchCount: document.getElementById("batch-count"),
+  batchGroupCheck: document.getElementById("batch-group-check"),
+  batchGroupField: document.getElementById("batch-group-field"),
+  batchGroupSelect: document.getElementById("batch-group-select"),
+  singleActions: document.getElementById("single-actions"),
+  batchActions: document.getElementById("batch-actions"),
+  batchSaveButton: document.getElementById("batch-save-button"),
+  batchClearButton: document.getElementById("batch-clear-button"),
+  groupChips: document.getElementById("group-chips"),
+  groupNewButton: document.getElementById("group-new-button"),
+  groupManageButton: document.getElementById("group-manage-button"),
+  modalRoot: document.getElementById("modal-root"),
+  modalTitle: document.getElementById("modal-title"),
+  modalBody: document.getElementById("modal-body"),
+  modalActions: document.getElementById("modal-actions"),
 };
+
+// ───── helpers ─────
 
 function setNotice(kind, message) {
   refs.notice.className = `notice is-visible notice-${kind}`;
@@ -95,15 +123,22 @@ function formatSpeed(value) {
 }
 
 function formatDate(value) {
-  if (!value) {
-    return "";
-  }
+  if (!value) return "";
   return new Intl.DateTimeFormat(undefined, {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
   }).format(value);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function shuffle(items) {
@@ -113,6 +148,29 @@ function shuffle(items) {
     [clone[index], clone[swapIndex]] = [clone[swapIndex], clone[index]];
   }
   return clone;
+}
+
+function getActiveDeck() {
+  return state.decks.find((d) => d.id === state.activeDeckId) || state.decks[0] || null;
+}
+
+function getActivePhrases() {
+  const deck = getActiveDeck();
+  return deck ? deck.phrases : [];
+}
+
+function getActiveGroups() {
+  const deck = getActiveDeck();
+  return deck ? deck.groups : [];
+}
+
+function getFilteredPhrases() {
+  const phrases = getActivePhrases();
+  if (!state.activeGroupId) return phrases;
+  const group = getActiveGroups().find((g) => g.id === state.activeGroupId);
+  if (!group) return phrases;
+  const phraseById = new Map(phrases.map((p) => [p.id, p]));
+  return group.phraseIds.map((id) => phraseById.get(id)).filter(Boolean);
 }
 
 function normalizeDraft(candidate) {
@@ -158,10 +216,17 @@ function setVoiceSelection(voices) {
   syncComposerMeta();
 }
 
+function getDefaultInstructions() {
+  const preset = INSTRUCTION_PRESETS.find((p) => p.label === DEFAULT_PRESET_LABEL);
+  return preset ? preset.instructions : "";
+}
+
+// ───── renders ─────
+
 function renderPresets() {
   refs.presetRow.innerHTML = INSTRUCTION_PRESETS.map(
     (preset) =>
-      `<button class="preset-chip" type="button" data-preset="${preset.label}">${preset.label}</button>`
+      `<button class="preset-chip${preset.label === DEFAULT_PRESET_LABEL ? " is-active" : ""}" type="button" data-preset="${escapeHtml(preset.label)}">${escapeHtml(preset.label)}</button>`
   ).join("");
 }
 
@@ -170,8 +235,8 @@ function renderVoiceGrid() {
     .map(
       (voice) => `
         <label class="voice-option">
-          <input type="checkbox" value="${voice}" />
-          <span>${voice}</span>
+          <input type="checkbox" value="${escapeHtml(voice)}" />
+          <span>${escapeHtml(voice)}</span>
         </label>
       `
     )
@@ -179,16 +244,60 @@ function renderVoiceGrid() {
   setVoiceSelection(state.defaultVoices);
 }
 
+function renderDeckSelect() {
+  refs.deckSelect.innerHTML = state.decks
+    .map(
+      (deck) =>
+        `<option value="${escapeHtml(deck.id)}"${deck.id === state.activeDeckId ? " selected" : ""}>${escapeHtml(deck.name)} (${deck.phrases.length})</option>`
+    )
+    .join("");
+}
+
+function renderGroupChips() {
+  const deck = getActiveDeck();
+  if (!deck) {
+    refs.groupChips.innerHTML = "";
+    refs.groupManageButton.hidden = true;
+    return;
+  }
+  const groups = deck.groups;
+  refs.groupManageButton.hidden = groups.length === 0;
+
+  const allSelected = state.activeGroupId === "" ? " is-active" : "";
+  const chips = [
+    `<button class="group-chip${allSelected}" type="button" data-group-filter="">
+       <span class="group-chip-name">All</span>
+       <span class="group-chip-count">${deck.phrases.length}</span>
+     </button>`,
+  ];
+  for (const group of groups) {
+    const isActive = state.activeGroupId === group.id ? " is-active" : "";
+    chips.push(
+      `<button class="group-chip${isActive}" type="button" data-group-filter="${escapeHtml(group.id)}" title="${escapeHtml(group.name)}">
+         <span class="group-chip-name">${escapeHtml(group.name)}</span>
+         <span class="group-chip-count">${group.phraseIds.length}</span>
+         <span class="group-chip-drill" data-group-drill="${escapeHtml(group.id)}" role="button" aria-label="Start drill on ${escapeHtml(group.name)}" title="Start drill">▶</span>
+       </button>`
+    );
+  }
+  refs.groupChips.innerHTML = chips.join("");
+}
+
 function syncComposerMeta() {
   const selectedVoices = currentVoiceSelection();
   const hasLoadedPhrase = Boolean(state.loadedPhraseId);
   refs.voiceCount.textContent = `${selectedVoices.length} voice${selectedVoices.length === 1 ? "" : "s"} selected`;
   refs.speedValue.textContent = formatSpeed(refs.speedInput.value);
-  refs.activePhrasePill.textContent = state.formDirty
-    ? "Modified draft"
-    : hasLoadedPhrase
-      ? "Saved phrase"
-      : "Unsaved draft";
+
+  const isBatch = state.mode === "batch";
+  refs.activePhrasePill.textContent = isBatch
+    ? "Batch mode"
+    : state.formDirty
+      ? "Modified draft"
+      : hasLoadedPhrase
+        ? "Saved phrase"
+        : "Unsaved draft";
+
   refs.saveButton.textContent = hasLoadedPhrase ? "Save as new phrase" : "Save phrase";
   refs.updateButton.hidden = !hasLoadedPhrase;
 
@@ -201,12 +310,12 @@ function syncComposerMeta() {
   refs.stopButton.disabled = !variantReady;
 }
 
-function collectPhrasePayload() {
+function collectPhrasePayload({ allowMissingVoices = false } = {}) {
   const payload = getCurrentDraft();
   if (!payload.text) {
-    throw new Error("Enter a Russian phrase first.");
+    throw new Error("Enter a phrase first.");
   }
-  if (!payload.voices.length) {
+  if (!payload.voices.length && !allowMissingVoices) {
     throw new Error("Select at least one voice.");
   }
   if (state.userRecording?.serverUrl) {
@@ -262,15 +371,39 @@ async function fetchJson(url, options = {}) {
 }
 
 function upsertPhrase(phrase) {
-  const existingIndex = state.phrases.findIndex((item) => item.id === phrase.id);
+  const deck = getActiveDeck();
+  if (!deck) return;
+  const existingIndex = deck.phrases.findIndex((item) => item.id === phrase.id);
   if (existingIndex >= 0) {
-    state.phrases.splice(existingIndex, 1, phrase);
+    deck.phrases.splice(existingIndex, 1, phrase);
   } else {
-    state.phrases.push(phrase);
-    state.drillSelectedIds.add(phrase.id);
+    deck.phrases.unshift(phrase);
   }
-  state.phrases.sort((left, right) => right.updatedAt - left.updatedAt);
+  deck.phrases.sort((left, right) => right.updatedAt - left.updatedAt);
 }
+
+function replaceDeck(updated) {
+  const idx = state.decks.findIndex((d) => d.id === updated.id);
+  if (idx >= 0) state.decks.splice(idx, 1, updated);
+  else state.decks.push(updated);
+}
+
+function upsertGroup(group) {
+  const deck = getActiveDeck();
+  if (!deck) return;
+  const idx = deck.groups.findIndex((g) => g.id === group.id);
+  if (idx >= 0) deck.groups.splice(idx, 1, group);
+  else deck.groups.push(group);
+}
+
+function removeGroupLocal(groupId) {
+  const deck = getActiveDeck();
+  if (!deck) return;
+  deck.groups = deck.groups.filter((g) => g.id !== groupId);
+  if (state.activeGroupId === groupId) state.activeGroupId = "";
+}
+
+// ───── variants ─────
 
 function renderVariants() {
   const hasContent = state.variants.length > 0 || state.userRecording;
@@ -300,7 +433,7 @@ function renderVariants() {
         <div class="variant-actions">
           <button class="mini-button play-variant-button" type="button" data-variant-id="user-recording">Play</button>
           <button class="mini-button re-record-button" type="button">Re-record</button>
-          <audio class="audio-player" controls preload="auto" data-variant-id="user-recording" src="${state.userRecording.url}"></audio>
+          <audio class="audio-player" controls preload="auto" data-variant-id="user-recording" src="${escapeHtml(state.userRecording.url)}"></audio>
         </div>
       </article>
     `;
@@ -310,15 +443,15 @@ function renderVariants() {
     .map((variant) => {
       const isPlaying = variant.id === state.playingVariantId;
       return `
-        <article class="variant-card ${isPlaying ? "is-playing" : ""}" data-variant-id="${variant.id}">
+        <article class="variant-card ${isPlaying ? "is-playing" : ""}" data-variant-id="${escapeHtml(variant.id)}">
           <div class="variant-top">
-            <span class="voice-badge">${variant.voice}</span>
+            <span class="voice-badge">${escapeHtml(variant.voice)}</span>
             <span class="variant-meta">${formatSpeed(variant.speed)} ${variant.cached ? "· cached" : "· fresh"}</span>
           </div>
           <p class="variant-note">Same phrase, new speaker shape. Use cycle mode for quick contrast reps.</p>
           <div class="variant-actions">
-            <button class="mini-button play-variant-button" type="button" data-variant-id="${variant.id}">Play</button>
-            <audio class="audio-player" controls preload="none" data-variant-id="${variant.id}" src="${variant.url}"></audio>
+            <button class="mini-button play-variant-button" type="button" data-variant-id="${escapeHtml(variant.id)}">Play</button>
+            <audio class="audio-player" controls preload="none" data-variant-id="${escapeHtml(variant.id)}" src="${escapeHtml(variant.url)}"></audio>
           </div>
         </article>
       `;
@@ -341,44 +474,86 @@ function renderVariants() {
   });
 }
 
-function renderLibrary() {
-  refs.libraryCount.textContent = `${state.phrases.length} saved phrase${state.phrases.length === 1 ? "" : "s"}`;
+// ───── library ─────
 
-  if (!state.phrases.length) {
+function renderLibrary() {
+  const deck = getActiveDeck();
+  const deckPhrases = deck ? deck.phrases : [];
+  const deckGroups = deck ? deck.groups : [];
+  const filteredPhrases = getFilteredPhrases();
+
+  const activeGroup = deckGroups.find((g) => g.id === state.activeGroupId);
+  const phraseCountLabel = activeGroup
+    ? `${filteredPhrases.length} in "${activeGroup.name}" · ${deckPhrases.length} total`
+    : `${deckPhrases.length} saved phrase${deckPhrases.length === 1 ? "" : "s"}`;
+  refs.libraryCount.textContent = phraseCountLabel;
+
+  renderDeckSelect();
+  renderGroupChips();
+
+  if (!deckPhrases.length) {
     refs.libraryList.innerHTML = `<div class="empty-state">Save the phrases that still need ear work. They will stay on the server-backed phrase bank for later practice.</div>`;
     syncDrillUI();
     return;
   }
+  if (!filteredPhrases.length) {
+    refs.libraryList.innerHTML = `<div class="empty-state">No phrases in this group yet. Click the "+" on any phrase below to add it to a group.</div>`;
+    syncDrillUI();
+    return;
+  }
 
-  refs.libraryList.innerHTML = state.phrases
+  const groupLookup = new Map(deckGroups.map((g) => [g.id, g]));
+
+  refs.libraryList.innerHTML = filteredPhrases
     .map((phrase) => {
       const isActive = phrase.id === state.loadedPhraseId;
-      const isDrillSelected = state.drillSelectedIds.has(phrase.id);
       const isDrillPlaying = state.drillPlayingPhraseId === phrase.id;
-      const note = phrase.note ? `<p class="library-note">${phrase.note}</p>` : "";
+      const note = phrase.note ? `<p class="library-note">${escapeHtml(phrase.note)}</p>` : "";
       const instructionNote = phrase.instructions ? "voice direction saved" : "plain delivery";
+      const badges = deckGroups
+        .filter((g) => g.phraseIds.includes(phrase.id))
+        .map(
+          (g) =>
+            `<button class="group-badge" type="button" data-action="toggle-group" data-phrase-id="${escapeHtml(phrase.id)}" data-group-id="${escapeHtml(g.id)}" title="Remove from ${escapeHtml(g.name)}">${escapeHtml(g.name)} ×</button>`
+        )
+        .join("");
       return `
-        <article class="library-card ${isActive ? "is-active" : ""} ${!isDrillSelected ? "is-drill-excluded" : ""} ${isDrillPlaying ? "is-drill-playing" : ""}" data-phrase-id="${phrase.id}">
+        <article class="library-card ${isActive ? "is-active" : ""} ${isDrillPlaying ? "is-drill-playing" : ""}" data-phrase-id="${escapeHtml(phrase.id)}">
           <div class="library-top">
             <div class="library-top-left">
-              <input type="checkbox" class="drill-check" data-phrase-id="${phrase.id}" ${isDrillSelected ? "checked" : ""} />
-              <span class="library-tag">${phrase.voices.length} voices</span>
+              <span class="library-tag">${phrase.voices.length} voice${phrase.voices.length === 1 ? "" : "s"}</span>
             </div>
             <span class="library-date">${formatDate(phrase.updatedAt)}</span>
           </div>
-          <p class="library-text">${phrase.text}</p>
+          <p class="library-text">${escapeHtml(phrase.text)}</p>
           ${note}
           <p class="library-meta">${formatSpeed(phrase.speed)} · ${instructionNote}</p>
+          <div class="library-groups">
+            ${badges}
+            <button class="group-badge group-badge-add" type="button" data-action="open-group-popover" data-phrase-id="${escapeHtml(phrase.id)}" title="Add to a group">+ Group</button>
+          </div>
           <div class="library-actions">
-            <button class="mini-button" type="button" data-action="load" data-phrase-id="${phrase.id}">Load</button>
-            <button class="mini-button" type="button" data-action="practice" data-phrase-id="${phrase.id}">Practice</button>
-            <button class="mini-button" type="button" data-action="delete" data-phrase-id="${phrase.id}">Delete</button>
+            <button class="mini-button" type="button" data-action="load" data-phrase-id="${escapeHtml(phrase.id)}">Load</button>
+            <button class="mini-button" type="button" data-action="practice" data-phrase-id="${escapeHtml(phrase.id)}">Practice</button>
+            <button class="mini-button is-danger" type="button" data-action="delete" data-phrase-id="${escapeHtml(phrase.id)}">Delete</button>
           </div>
         </article>
       `;
     })
     .join("");
   syncDrillUI();
+}
+
+// ───── composer ─────
+
+function applyPreset(label) {
+  const preset = INSTRUCTION_PRESETS.find((p) => p.label === label);
+  if (!preset) return;
+  refs.instructionsInput.value = preset.instructions;
+  refs.speedInput.value = String(preset.speed);
+  refs.presetRow.querySelectorAll("[data-preset]").forEach((candidate) => {
+    candidate.classList.toggle("is-active", candidate.dataset.preset === label);
+  });
 }
 
 function populateComposer(phrase) {
@@ -399,17 +574,24 @@ function populateComposer(phrase) {
   }
   state.variants = [];
   state.playingVariantId = "";
+  refs.presetRow.querySelectorAll("[data-preset]").forEach((candidate) => {
+    candidate.classList.remove("is-active");
+  });
   renderVariants();
   renderLibrary();
   syncComposerMeta();
 }
 
-function clearComposer() {
+function clearComposer({ keepPreset = true } = {}) {
   stopCycle();
   refs.phraseInput.value = "";
   refs.noteInput.value = "";
-  refs.instructionsInput.value = "";
-  refs.speedInput.value = "1";
+  if (keepPreset) {
+    applyPreset(DEFAULT_PRESET_LABEL);
+  } else {
+    refs.instructionsInput.value = "";
+    refs.speedInput.value = "1";
+  }
   setLoadedPhrase(null);
   clearUserRecording();
   state.variants = [];
@@ -419,6 +601,71 @@ function clearComposer() {
   renderLibrary();
   syncComposerMeta();
 }
+
+function setMode(mode) {
+  state.mode = mode;
+  const isBatch = mode === "batch";
+  refs.modeSingleButton.classList.toggle("is-active", !isBatch);
+  refs.modeBatchButton.classList.toggle("is-active", isBatch);
+  refs.modeSingleButton.setAttribute("aria-selected", String(!isBatch));
+  refs.modeBatchButton.setAttribute("aria-selected", String(isBatch));
+  refs.singleMode.hidden = isBatch;
+  refs.batchMode.hidden = !isBatch;
+  refs.singleActions.hidden = isBatch;
+  refs.batchActions.hidden = !isBatch;
+  if (isBatch) {
+    refreshBatchCount();
+    refreshBatchGroupOptions();
+  }
+  syncComposerMeta();
+}
+
+// ───── batch parsing ─────
+
+function parseBatchInput(raw) {
+  const lines = raw.split(/\r?\n/);
+  const result = [];
+  const errors = [];
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    let text = trimmed;
+    let note = "";
+    const separators = ["\t", "|", "=", "—", " - "];
+    for (const sep of separators) {
+      const idx = trimmed.indexOf(sep);
+      if (idx > 0) {
+        text = trimmed.slice(0, idx).trim();
+        note = trimmed.slice(idx + sep.length).trim();
+        break;
+      }
+    }
+    if (!text) {
+      errors.push(`Line ${index + 1}: empty phrase.`);
+      return;
+    }
+    result.push({ text, note });
+  });
+  return { items: result, errors };
+}
+
+function refreshBatchCount() {
+  const { items, errors } = parseBatchInput(refs.batchInput.value);
+  const parts = [`${items.length} phrase${items.length === 1 ? "" : "s"} detected`];
+  if (errors.length) parts.push(`${errors.length} skipped`);
+  refs.batchCount.textContent = parts.join(" · ") + ".";
+  refs.batchSaveButton.disabled = items.length === 0;
+}
+
+function refreshBatchGroupOptions() {
+  const groups = getActiveGroups();
+  refs.batchGroupSelect.innerHTML = groups.length
+    ? groups.map((g) => `<option value="${escapeHtml(g.id)}">${escapeHtml(g.name)}</option>`).join("") +
+      `<option value="__new__">+ New group…</option>`
+    : `<option value="__new__">+ New group…</option>`;
+}
+
+// ───── play / cycle ─────
 
 function applyPlayingState() {
   refs.variantList.querySelectorAll(".variant-card").forEach((card) => {
@@ -439,9 +686,7 @@ function stopCycle() {
 function playSingleVariant(variantId) {
   stopCycle();
   const audio = document.querySelector(`audio[data-variant-id="${variantId}"]`);
-  if (!audio) {
-    return;
-  }
+  if (!audio) return;
   state.playingVariantId = variantId;
   applyPlayingState();
   audio.currentTime = 0;
@@ -462,9 +707,7 @@ function playSingleVariant(variantId) {
 
 async function playVariantAndWait(variantId, token) {
   const audio = document.querySelector(`audio[data-variant-id="${variantId}"]`);
-  if (!audio) {
-    return;
-  }
+  if (!audio) return;
   document.querySelectorAll("audio[data-variant-id]").forEach((candidate) => {
     if (candidate !== audio) {
       candidate.pause();
@@ -503,30 +746,21 @@ async function playVariantAndWait(variantId, token) {
 }
 
 async function cycleVariants({ random = false } = {}) {
-  if (!state.variants.length && !state.userRecording) {
-    return;
-  }
-
+  if (!state.variants.length && !state.userRecording) return;
   if (state.drillActive) stopDrill();
   stopCycle();
   const token = state.cycleToken;
   let items = [...state.variants];
-  if (state.userRecording) {
-    items.unshift({ id: "user-recording" });
-  }
+  if (state.userRecording) items.unshift({ id: "user-recording" });
   const queue = random ? shuffle(items) : items;
   setNotice("info", random ? "Shuffle cycle running." : "Cycle running.");
 
   try {
     for (const variant of queue) {
-      if (token !== state.cycleToken) {
-        return;
-      }
+      if (token !== state.cycleToken) return;
       await playVariantAndWait(variant.id, token);
     }
-    if (token === state.cycleToken) {
-      setNotice("success", "Cycle complete.");
-    }
+    if (token === state.cycleToken) setNotice("success", "Cycle complete.");
   } catch (error) {
     setNotice("error", error.message || "Audio playback failed.");
   } finally {
@@ -537,7 +771,14 @@ async function cycleVariants({ random = false } = {}) {
   }
 }
 
+// ───── generate / save ─────
+
 async function generateCurrentPhrase({ silent = false } = {}) {
+  const deck = getActiveDeck();
+  if (!deck) {
+    setNotice("warning", "Create a deck first.");
+    return;
+  }
   let payload;
   try {
     payload = collectPhrasePayload();
@@ -552,9 +793,7 @@ async function generateCurrentPhrase({ silent = false } = {}) {
 
   state.isGenerating = true;
   syncComposerMeta();
-  if (!silent) {
-    setNotice("info", "Generating voice pack...");
-  }
+  if (!silent) setNotice("info", "Generating voice pack...");
 
   try {
     const response = await fetchJson(`${API_BASE}/generate`, {
@@ -563,9 +802,7 @@ async function generateCurrentPhrase({ silent = false } = {}) {
     });
     state.variants = response.variants || [];
     renderVariants();
-    if (!silent) {
-      setNotice("success", `${state.variants.length} voice variants ready.`);
-    }
+    if (!silent) setNotice("success", `${state.variants.length} voice variants ready.`);
   } catch (error) {
     setNotice("error", error.message);
   } finally {
@@ -575,6 +812,11 @@ async function generateCurrentPhrase({ silent = false } = {}) {
 }
 
 async function saveCurrentPhrase({ mode = "new" } = {}) {
+  const deck = getActiveDeck();
+  if (!deck) {
+    setNotice("warning", "Create a deck first.");
+    return;
+  }
   let payload;
   try {
     payload = collectPhrasePayload();
@@ -586,7 +828,7 @@ async function saveCurrentPhrase({ mode = "new" } = {}) {
   state.isSaving = true;
   syncComposerMeta();
   let method = "POST";
-  let url = `${API_BASE}/phrases`;
+  let url = `${API_BASE}/decks/${deck.id}/phrases`;
   let progressMessage = "Saving phrase...";
   let successMessage = "Phrase saved.";
 
@@ -598,7 +840,7 @@ async function saveCurrentPhrase({ mode = "new" } = {}) {
       return;
     }
     method = "PUT";
-    url = `${API_BASE}/phrases/${state.loadedPhraseId}`;
+    url = `${API_BASE}/decks/${deck.id}/phrases/${state.loadedPhraseId}`;
     progressMessage = "Updating loaded phrase...";
     successMessage = "Loaded phrase updated.";
   } else if (state.loadedPhraseId) {
@@ -609,10 +851,7 @@ async function saveCurrentPhrase({ mode = "new" } = {}) {
   setNotice("info", progressMessage);
 
   try {
-    const response = await fetchJson(url, {
-      method,
-      body: JSON.stringify(payload),
-    });
+    const response = await fetchJson(url, { method, body: JSON.stringify(payload) });
     const savedPhrase = response.phrase;
     setLoadedPhrase(savedPhrase);
     upsertPhrase(savedPhrase);
@@ -627,19 +866,116 @@ async function saveCurrentPhrase({ mode = "new" } = {}) {
   }
 }
 
-async function deletePhrase(phraseId) {
-  const phrase = state.phrases.find((item) => item.id === phraseId);
-  if (!phrase) {
+async function saveBatchPhrases() {
+  const deck = getActiveDeck();
+  if (!deck) {
+    setNotice("warning", "Create a deck first.");
     return;
   }
-  if (!window.confirm(`Delete "${phrase.text}" from the saved bank?`)) {
+  const { items, errors } = parseBatchInput(refs.batchInput.value);
+  if (!items.length) {
+    setNotice("warning", "Add at least one phrase to the batch.");
     return;
   }
 
+  const instructions = refs.instructionsInput.value.trim();
+  const speed = Number(refs.speedInput.value);
+  const voices = currentVoiceSelection();
+  if (!voices.length) {
+    setNotice("warning", "Select at least one voice for the batch.");
+    return;
+  }
+
+  const payload = {
+    phrases: items.map((item) => ({
+      text: item.text,
+      note: item.note,
+      instructions,
+      speed,
+      voices,
+    })),
+  };
+
+  // Resolve group target before we mutate state, so a failed group create
+  // doesn't leave the user wondering why phrases saved but didn't land anywhere.
+  let targetGroupId = null;
+  if (refs.batchGroupCheck.checked) {
+    const selectValue = refs.batchGroupSelect.value;
+    if (selectValue === "__new__" || !selectValue) {
+      const name = window.prompt("Name for the new group:", "");
+      if (!name || !name.trim()) {
+        setNotice("info", "Batch cancelled.");
+        return;
+      }
+      try {
+        const created = await createGroup(name.trim());
+        targetGroupId = created?.id || null;
+      } catch (error) {
+        setNotice("error", error.message);
+        return;
+      }
+    } else {
+      targetGroupId = selectValue;
+    }
+  }
+
+  state.isSaving = true;
+  syncComposerMeta();
+  setNotice("info", `Saving ${items.length} phrase${items.length === 1 ? "" : "s"}...`);
+
   try {
-    await fetchJson(`${API_BASE}/phrases/${phraseId}`, { method: "DELETE" });
-    state.phrases = state.phrases.filter((item) => item.id !== phraseId);
-    state.drillSelectedIds.delete(phraseId);
+    const response = await fetchJson(`${API_BASE}/decks/${deck.id}/phrases/batch`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    const saved = response.phrases || [];
+    for (const phrase of saved) upsertPhrase(phrase);
+
+    if (targetGroupId && saved.length) {
+      const deckNow = getActiveDeck();
+      const group = deckNow?.groups.find((g) => g.id === targetGroupId);
+      if (group) {
+        const merged = Array.from(new Set([...group.phraseIds, ...saved.map((p) => p.id)]));
+        try {
+          const updated = await fetchJson(`${API_BASE}/decks/${deck.id}/groups/${group.id}`, {
+            method: "PUT",
+            body: JSON.stringify({ name: group.name, phraseIds: merged }),
+          });
+          upsertGroup(updated.group);
+        } catch (error) {
+          setNotice("warning", `Saved ${saved.length} phrase(s), but adding to the group failed: ${error.message}`);
+          renderLibrary();
+          return;
+        }
+      }
+    }
+
+    refs.batchInput.value = "";
+    refreshBatchCount();
+    const extra = errors.length ? ` (${errors.length} line${errors.length === 1 ? "" : "s"} skipped)` : "";
+    setNotice("success", `Saved ${saved.length} phrase${saved.length === 1 ? "" : "s"}${extra}.`);
+    renderLibrary();
+  } catch (error) {
+    setNotice("error", error.message);
+  } finally {
+    state.isSaving = false;
+    syncComposerMeta();
+  }
+}
+
+async function deletePhrase(phraseId) {
+  const deck = getActiveDeck();
+  if (!deck) return;
+  const phrase = deck.phrases.find((item) => item.id === phraseId);
+  if (!phrase) return;
+  if (!window.confirm(`Delete "${phrase.text}" from "${deck.name}"?`)) return;
+
+  try {
+    await fetchJson(`${API_BASE}/decks/${deck.id}/phrases/${phraseId}`, { method: "DELETE" });
+    deck.phrases = deck.phrases.filter((item) => item.id !== phraseId);
+    for (const group of deck.groups) {
+      group.phraseIds = group.phraseIds.filter((id) => id !== phraseId);
+    }
     if (state.loadedPhraseId === phraseId) {
       clearComposer();
     } else {
@@ -652,25 +988,24 @@ async function deletePhrase(phraseId) {
 }
 
 async function loadPhrase(phraseId, { practice = false } = {}) {
-  const phrase = state.phrases.find((item) => item.id === phraseId);
-  if (!phrase) {
-    return;
-  }
+  const deck = getActiveDeck();
+  if (!deck) return;
+  const phrase = deck.phrases.find((item) => item.id === phraseId);
+  if (!phrase) return;
+  setMode("single");
   populateComposer(phrase);
   setNotice("info", "Phrase loaded.");
   if (practice) {
     await generateCurrentPhrase({ silent: true });
-    if (state.variants.length) {
-      setNotice("success", "Saved phrase loaded and generated.");
-    }
+    if (state.variants.length) setNotice("success", "Saved phrase loaded and generated.");
   }
 }
 
+// ───── recording ─────
+
 function clearUserRecording() {
   if (state.userRecording) {
-    if (state.userRecording.blob) {
-      URL.revokeObjectURL(state.userRecording.url);
-    }
+    if (state.userRecording.blob) URL.revokeObjectURL(state.userRecording.url);
     state.userRecording = null;
   }
 }
@@ -738,14 +1073,15 @@ async function startRecording() {
         };
         renderVariants();
 
-        if (state.loadedPhraseId && state.loadedPhraseSnapshot) {
+        const deck = getActiveDeck();
+        if (deck && state.loadedPhraseId && state.loadedPhraseSnapshot) {
           try {
             const savePayload = { ...state.loadedPhraseSnapshot, recordingUrl: result.url };
-            await fetchJson(`${API_BASE}/phrases/${state.loadedPhraseId}`, {
+            await fetchJson(`${API_BASE}/decks/${deck.id}/phrases/${state.loadedPhraseId}`, {
               method: "PUT",
               body: JSON.stringify(savePayload),
             });
-            const localPhrase = state.phrases.find((p) => p.id === state.loadedPhraseId);
+            const localPhrase = deck.phrases.find((p) => p.id === state.loadedPhraseId);
             if (localPhrase) localPhrase.recordingUrl = result.url;
             setNotice("success", "Recording saved and linked to phrase.");
           } catch (autoSaveError) {
@@ -784,17 +1120,19 @@ function stopRecording() {
   }
 }
 
+// ───── drill ─────
+
 function syncDrillUI() {
-  const selectedCount = state.drillSelectedIds.size;
-  const totalCount = state.phrases.length;
-  refs.drillStartButton.disabled = selectedCount === 0 || state.drillActive;
+  const filtered = getFilteredPhrases();
+  refs.drillStartButton.disabled = filtered.length === 0 || state.drillActive;
   refs.drillStopButton.hidden = !state.drillActive;
   refs.drillStartButton.hidden = state.drillActive;
-  refs.drillSelectAllButton.disabled = state.drillActive;
-  refs.drillClearButton.disabled = state.drillActive;
-  if (totalCount === 0) {
-    refs.drillStartButton.disabled = true;
-  }
+
+  const deck = getActiveDeck();
+  const group = deck?.groups.find((g) => g.id === state.activeGroupId);
+  refs.drillStartButton.textContent = group
+    ? `▶ Drill "${group.name}" (${filtered.length})`
+    : `▶ Start drill (${filtered.length})`;
 }
 
 function setDrillStatus(message) {
@@ -818,24 +1156,23 @@ function stopDrill() {
   syncDrillUI();
 }
 
-async function startDrill() {
-  const selected = state.phrases.filter((p) => state.drillSelectedIds.has(p.id));
-  if (!selected.length) {
-    setNotice("warning", "Select at least one phrase for the drill.");
+async function startDrillWithPhrases(phrases, label) {
+  if (!phrases.length) {
+    setNotice("warning", "No phrases to drill.");
     return;
   }
-
   stopCycle();
   state.drillActive = true;
   state.drillToken += 1;
   const token = state.drillToken;
   syncDrillUI();
   renderLibrary();
-  setDrillStatus(`Drill running: ${selected.length} phrase${selected.length === 1 ? "" : "s"} selected.`);
+  const base = label ? `Drill: ${label}` : "Drill";
+  setDrillStatus(`${base} — ${phrases.length} phrase${phrases.length === 1 ? "" : "s"}.`);
 
   try {
     while (state.drillActive && token === state.drillToken) {
-      const phraseOrder = shuffle(selected);
+      const phraseOrder = shuffle(phrases);
       for (const phrase of phraseOrder) {
         if (token !== state.drillToken) return;
 
@@ -889,9 +1226,7 @@ async function startDrill() {
       }
     }
   } catch (error) {
-    if (token === state.drillToken) {
-      setNotice("error", error.message || "Drill playback error.");
-    }
+    if (token === state.drillToken) setNotice("error", error.message || "Drill playback error.");
   } finally {
     if (token === state.drillToken) {
       state.drillActive = false;
@@ -904,23 +1239,317 @@ async function startDrill() {
   }
 }
 
+function startDrillOnCurrentView() {
+  const deck = getActiveDeck();
+  const group = deck?.groups.find((g) => g.id === state.activeGroupId);
+  const phrases = getFilteredPhrases();
+  startDrillWithPhrases(phrases, group ? group.name : null);
+}
+
+function startDrillOnGroup(groupId) {
+  const deck = getActiveDeck();
+  const group = deck?.groups.find((g) => g.id === groupId);
+  if (!group) return;
+  const phraseById = new Map(deck.phrases.map((p) => [p.id, p]));
+  const phrases = group.phraseIds.map((id) => phraseById.get(id)).filter(Boolean);
+  startDrillWithPhrases(phrases, group.name);
+}
+
+// ───── decks ─────
+
+async function createDeck() {
+  const name = window.prompt("New deck name (e.g. French, Spanish):", "");
+  if (!name || !name.trim()) return;
+  try {
+    const response = await fetchJson(`${API_BASE}/decks`, {
+      method: "POST",
+      body: JSON.stringify({ name: name.trim() }),
+    });
+    state.decks.push(response.deck);
+    state.activeDeckId = response.deck.id;
+    state.activeGroupId = "";
+    persistDeckSelection();
+    setNotice("success", `Deck "${response.deck.name}" created.`);
+    clearComposer();
+    renderLibrary();
+  } catch (error) {
+    setNotice("error", error.message);
+  }
+}
+
+async function renameDeck() {
+  const deck = getActiveDeck();
+  if (!deck) return;
+  const name = window.prompt("Rename deck to:", deck.name);
+  if (!name || !name.trim() || name.trim() === deck.name) return;
+  try {
+    const response = await fetchJson(`${API_BASE}/decks/${deck.id}`, {
+      method: "PUT",
+      body: JSON.stringify({ name: name.trim() }),
+    });
+    replaceDeck(response.deck);
+    renderLibrary();
+    setNotice("success", `Deck renamed to "${response.deck.name}".`);
+  } catch (error) {
+    setNotice("error", error.message);
+  }
+}
+
+async function deleteDeck() {
+  const deck = getActiveDeck();
+  if (!deck) return;
+  if (state.decks.length <= 1) {
+    setNotice("warning", "You need at least one deck.");
+    return;
+  }
+  if (!window.confirm(`Delete deck "${deck.name}" and all its ${deck.phrases.length} phrases? This cannot be undone.`)) return;
+  try {
+    await fetchJson(`${API_BASE}/decks/${deck.id}`, { method: "DELETE" });
+    state.decks = state.decks.filter((d) => d.id !== deck.id);
+    state.activeDeckId = state.decks[0]?.id || "";
+    state.activeGroupId = "";
+    persistDeckSelection();
+    clearComposer();
+    renderLibrary();
+    setNotice("success", `Deck "${deck.name}" deleted.`);
+  } catch (error) {
+    setNotice("error", error.message);
+  }
+}
+
+function switchDeck(deckId) {
+  if (!state.decks.find((d) => d.id === deckId)) return;
+  state.activeDeckId = deckId;
+  state.activeGroupId = "";
+  persistDeckSelection();
+  clearComposer();
+  renderLibrary();
+}
+
+function persistDeckSelection() {
+  try {
+    if (state.activeDeckId) window.localStorage.setItem(ACTIVE_DECK_KEY, state.activeDeckId);
+    else window.localStorage.removeItem(ACTIVE_DECK_KEY);
+  } catch {}
+}
+
+// ───── groups ─────
+
+async function createGroup(nameOverride) {
+  const deck = getActiveDeck();
+  if (!deck) return null;
+  const name = nameOverride ?? window.prompt("New group name:", "");
+  if (!name || !name.trim()) return null;
+  const response = await fetchJson(`${API_BASE}/decks/${deck.id}/groups`, {
+    method: "POST",
+    body: JSON.stringify({ name: name.trim() }),
+  });
+  upsertGroup(response.group);
+  renderLibrary();
+  refreshBatchGroupOptions();
+  setNotice("success", `Group "${response.group.name}" created.`);
+  return response.group;
+}
+
+async function deleteGroup(groupId) {
+  const deck = getActiveDeck();
+  if (!deck) return;
+  const group = deck.groups.find((g) => g.id === groupId);
+  if (!group) return;
+  if (!window.confirm(`Delete group "${group.name}"? (Phrases stay in the deck.)`)) return;
+  try {
+    await fetchJson(`${API_BASE}/decks/${deck.id}/groups/${groupId}`, { method: "DELETE" });
+    removeGroupLocal(groupId);
+    renderLibrary();
+    refreshBatchGroupOptions();
+    setNotice("success", `Group "${group.name}" deleted.`);
+  } catch (error) {
+    setNotice("error", error.message);
+  }
+}
+
+async function renameGroup(groupId) {
+  const deck = getActiveDeck();
+  if (!deck) return;
+  const group = deck.groups.find((g) => g.id === groupId);
+  if (!group) return;
+  const name = window.prompt("Rename group to:", group.name);
+  if (!name || !name.trim() || name.trim() === group.name) return;
+  try {
+    const response = await fetchJson(`${API_BASE}/decks/${deck.id}/groups/${groupId}`, {
+      method: "PUT",
+      body: JSON.stringify({ name: name.trim(), phraseIds: group.phraseIds }),
+    });
+    upsertGroup(response.group);
+    renderLibrary();
+    refreshBatchGroupOptions();
+    setNotice("success", `Group renamed to "${response.group.name}".`);
+  } catch (error) {
+    setNotice("error", error.message);
+  }
+}
+
+async function togglePhraseInGroup(phraseId, groupId) {
+  const deck = getActiveDeck();
+  if (!deck) return;
+  const group = deck.groups.find((g) => g.id === groupId);
+  if (!group) return;
+  const next = group.phraseIds.includes(phraseId)
+    ? group.phraseIds.filter((id) => id !== phraseId)
+    : [...group.phraseIds, phraseId];
+  try {
+    const response = await fetchJson(`${API_BASE}/decks/${deck.id}/groups/${groupId}`, {
+      method: "PUT",
+      body: JSON.stringify({ name: group.name, phraseIds: next }),
+    });
+    upsertGroup(response.group);
+    renderLibrary();
+  } catch (error) {
+    setNotice("error", error.message);
+  }
+}
+
+// ───── modal ─────
+
+function openModal({ title, body, actions = [] }) {
+  refs.modalTitle.textContent = title;
+  if (typeof body === "string") refs.modalBody.innerHTML = body;
+  else {
+    refs.modalBody.innerHTML = "";
+    refs.modalBody.appendChild(body);
+  }
+  refs.modalActions.innerHTML = "";
+  actions.forEach((action) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = action.primary ? "primary-button" : "ghost-button";
+    button.textContent = action.label;
+    button.addEventListener("click", async () => {
+      await action.onClick();
+    });
+    refs.modalActions.appendChild(button);
+  });
+  refs.modalRoot.hidden = false;
+}
+
+function closeModal() {
+  refs.modalRoot.hidden = true;
+  refs.modalBody.innerHTML = "";
+  refs.modalActions.innerHTML = "";
+}
+
+function openGroupPopover(phraseId, anchor) {
+  closeGroupPopover();
+  const deck = getActiveDeck();
+  if (!deck) return;
+  const popover = document.createElement("div");
+  popover.className = "group-popover";
+  popover.id = "group-popover";
+  const itemsHtml = deck.groups.length
+    ? deck.groups
+        .map(
+          (g) => `
+          <label class="group-popover-item">
+            <input type="checkbox" data-phrase-id="${escapeHtml(phraseId)}" data-group-id="${escapeHtml(g.id)}" ${g.phraseIds.includes(phraseId) ? "checked" : ""} />
+            <span>${escapeHtml(g.name)}</span>
+          </label>
+        `
+        )
+        .join("")
+    : `<p class="group-popover-empty">No groups yet.</p>`;
+  popover.innerHTML = `
+    <div class="group-popover-list">${itemsHtml}</div>
+    <button class="mini-button group-popover-new" type="button" data-phrase-id="${escapeHtml(phraseId)}">+ New group with this phrase</button>
+  `;
+  document.body.appendChild(popover);
+
+  const rect = anchor.getBoundingClientRect();
+  const top = rect.bottom + window.scrollY + 6;
+  const maxLeft = window.innerWidth - 280 - 12;
+  const left = Math.max(12, Math.min(rect.left + window.scrollX, maxLeft));
+  popover.style.top = `${top}px`;
+  popover.style.left = `${left}px`;
+
+  setTimeout(() => {
+    document.addEventListener("click", handlePopoverDocClick, { once: false });
+  }, 0);
+}
+
+function closeGroupPopover() {
+  const popover = document.getElementById("group-popover");
+  if (popover) popover.remove();
+  document.removeEventListener("click", handlePopoverDocClick);
+}
+
+function handlePopoverDocClick(event) {
+  const popover = document.getElementById("group-popover");
+  if (!popover) return;
+  if (popover.contains(event.target)) return;
+  if (event.target.closest('[data-action="open-group-popover"]')) return;
+  closeGroupPopover();
+}
+
+function openManageGroupsModal() {
+  const deck = getActiveDeck();
+  if (!deck) return;
+  const container = document.createElement("div");
+  container.className = "manage-groups-list";
+  if (!deck.groups.length) {
+    container.innerHTML = `<p class="empty-state">No groups yet. Create one from the "+ New group" button.</p>`;
+  } else {
+    container.innerHTML = deck.groups
+      .map(
+        (g) => `
+        <div class="manage-group-row" data-group-id="${escapeHtml(g.id)}">
+          <div>
+            <strong>${escapeHtml(g.name)}</strong>
+            <span class="subpanel-note"> · ${g.phraseIds.length} phrase${g.phraseIds.length === 1 ? "" : "s"}</span>
+          </div>
+          <div class="inline-actions">
+            <button class="mini-button" type="button" data-manage-action="rename" data-group-id="${escapeHtml(g.id)}">Rename</button>
+            <button class="mini-button" type="button" data-manage-action="drill" data-group-id="${escapeHtml(g.id)}">Drill</button>
+            <button class="mini-button is-danger" type="button" data-manage-action="delete" data-group-id="${escapeHtml(g.id)}">Delete</button>
+          </div>
+        </div>
+      `
+      )
+      .join("");
+  }
+  openModal({
+    title: `Manage groups — ${deck.name}`,
+    body: container,
+    actions: [{ label: "Close", onClick: closeModal }],
+  });
+
+  container.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-manage-action]");
+    if (!button) return;
+    const groupId = button.dataset.groupId;
+    const action = button.dataset.manageAction;
+    if (action === "rename") {
+      closeModal();
+      await renameGroup(groupId);
+      openManageGroupsModal();
+    } else if (action === "delete") {
+      closeModal();
+      await deleteGroup(groupId);
+      if (getActiveDeck()?.groups.length) openManageGroupsModal();
+    } else if (action === "drill") {
+      closeModal();
+      startDrillOnGroup(groupId);
+    }
+  });
+}
+
+// ───── events ─────
+
 function bindEvents() {
   renderPresets();
 
   refs.presetRow.addEventListener("click", (event) => {
     const button = event.target.closest("[data-preset]");
-    if (!button) {
-      return;
-    }
-    const preset = INSTRUCTION_PRESETS.find((item) => item.label === button.dataset.preset);
-    if (!preset) {
-      return;
-    }
-    refs.instructionsInput.value = preset.instructions;
-    refs.speedInput.value = String(preset.speed);
-    refs.presetRow.querySelectorAll("[data-preset]").forEach((candidate) => {
-      candidate.classList.toggle("is-active", candidate === button);
-    });
+    if (!button) return;
+    applyPreset(button.dataset.preset);
     syncDraftState({ announce: true });
   });
 
@@ -936,109 +1565,161 @@ function bindEvents() {
     syncDraftState({ announce: true });
   });
 
-  refs.generateButton.addEventListener("click", () => {
-    generateCurrentPhrase();
-  });
-  refs.saveButton.addEventListener("click", () => {
-    saveCurrentPhrase({ mode: "new" });
-  });
-  refs.updateButton.addEventListener("click", () => {
-    saveCurrentPhrase({ mode: "update" });
-  });
+  refs.generateButton.addEventListener("click", () => generateCurrentPhrase());
+  refs.saveButton.addEventListener("click", () => saveCurrentPhrase({ mode: "new" }));
+  refs.updateButton.addEventListener("click", () => saveCurrentPhrase({ mode: "update" }));
   refs.newButton.addEventListener("click", () => {
     clearComposer();
     setNotice("info", "Fresh draft ready.");
   });
 
-  refs.recommendedVoicesButton.addEventListener("click", () => {
-    setVoiceSelection(state.defaultVoices);
-  });
-  refs.allVoicesButton.addEventListener("click", () => {
-    setVoiceSelection(state.availableVoices);
-  });
-  refs.clearVoicesButton.addEventListener("click", () => {
-    setVoiceSelection([]);
-  });
+  refs.recommendedVoicesButton.addEventListener("click", () => setVoiceSelection(state.defaultVoices));
+  refs.allVoicesButton.addEventListener("click", () => setVoiceSelection(state.availableVoices));
+  refs.clearVoicesButton.addEventListener("click", () => setVoiceSelection([]));
 
-  refs.cycleButton.addEventListener("click", () => {
-    cycleVariants({ random: false });
-  });
-  refs.shuffleButton.addEventListener("click", () => {
-    cycleVariants({ random: true });
-  });
+  refs.cycleButton.addEventListener("click", () => cycleVariants({ random: false }));
+  refs.shuffleButton.addEventListener("click", () => cycleVariants({ random: true }));
   refs.stopButton.addEventListener("click", () => {
     stopCycle();
     setNotice("info", "Playback stopped.");
   });
 
   refs.recordButton.addEventListener("click", () => {
-    if (state.isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
+    if (state.isRecording) stopRecording();
+    else startRecording();
   });
 
   refs.variantList.addEventListener("click", (event) => {
     const reRecordBtn = event.target.closest(".re-record-button");
-    if (reRecordBtn) {
-      startRecording();
-      return;
-    }
+    if (reRecordBtn) { startRecording(); return; }
     const button = event.target.closest(".play-variant-button");
-    if (!button) {
-      return;
-    }
+    if (!button) return;
     playSingleVariant(button.dataset.variantId);
   });
 
   refs.libraryList.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-action]");
-    if (!button) {
+    const toggle = event.target.closest('[data-action="toggle-group"]');
+    if (toggle) {
+      togglePhraseInGroup(toggle.dataset.phraseId, toggle.dataset.groupId);
       return;
     }
+    const popoverBtn = event.target.closest('[data-action="open-group-popover"]');
+    if (popoverBtn) {
+      event.stopPropagation();
+      openGroupPopover(popoverBtn.dataset.phraseId, popoverBtn);
+      return;
+    }
+    const button = event.target.closest("[data-action]");
+    if (!button) return;
     const phraseId = button.dataset.phraseId;
     const action = button.dataset.action;
-    if (action === "load") {
-      loadPhrase(phraseId);
-      return;
-    }
-    if (action === "practice") {
-      loadPhrase(phraseId, { practice: true });
-      return;
-    }
-    if (action === "delete") {
-      deletePhrase(phraseId);
+    if (action === "load") loadPhrase(phraseId);
+    else if (action === "practice") loadPhrase(phraseId, { practice: true });
+    else if (action === "delete") deletePhrase(phraseId);
+  });
+
+  document.body.addEventListener("click", (event) => {
+    const popover = document.getElementById("group-popover");
+    if (!popover) return;
+    const newBtn = event.target.closest(".group-popover-new");
+    if (newBtn && popover.contains(newBtn)) {
+      const phraseId = newBtn.dataset.phraseId;
+      closeGroupPopover();
+      (async () => {
+        const created = await createGroup();
+        if (created) {
+          try {
+            await togglePhraseInGroup(phraseId, created.id);
+          } catch {}
+        }
+      })();
     }
   });
 
-  refs.libraryList.addEventListener("change", (event) => {
-    const checkbox = event.target.closest(".drill-check");
+  document.body.addEventListener("change", (event) => {
+    const checkbox = event.target.closest(".group-popover-item input[type=checkbox]");
     if (!checkbox) return;
-    const phraseId = checkbox.dataset.phraseId;
-    if (checkbox.checked) {
-      state.drillSelectedIds.add(phraseId);
-    } else {
-      state.drillSelectedIds.delete(phraseId);
-    }
-    renderLibrary();
+    togglePhraseInGroup(checkbox.dataset.phraseId, checkbox.dataset.groupId);
   });
 
-  refs.drillStartButton.addEventListener("click", () => {
-    startDrill();
-  });
+  refs.drillStartButton.addEventListener("click", () => startDrillOnCurrentView());
   refs.drillStopButton.addEventListener("click", () => {
     stopDrill();
     setNotice("info", "Drill stopped.");
   });
-  refs.drillSelectAllButton.addEventListener("click", () => {
-    state.phrases.forEach((p) => state.drillSelectedIds.add(p.id));
+
+  // Deck switcher.
+  refs.deckSelect.addEventListener("change", () => switchDeck(refs.deckSelect.value));
+  refs.deckMenuButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const isOpen = !refs.deckMenu.hidden;
+    refs.deckMenu.hidden = isOpen;
+    refs.deckMenuButton.setAttribute("aria-expanded", String(!isOpen));
+  });
+  document.addEventListener("click", (event) => {
+    if (!refs.deckMenu.hidden && !refs.deckMenu.contains(event.target) && event.target !== refs.deckMenuButton) {
+      refs.deckMenu.hidden = true;
+      refs.deckMenuButton.setAttribute("aria-expanded", "false");
+    }
+  });
+  refs.deckMenu.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-deck-action]");
+    if (!button) return;
+    refs.deckMenu.hidden = true;
+    refs.deckMenuButton.setAttribute("aria-expanded", "false");
+    const action = button.dataset.deckAction;
+    if (action === "new") createDeck();
+    else if (action === "rename") renameDeck();
+    else if (action === "delete") deleteDeck();
+  });
+
+  // Mode toggle.
+  refs.modeSingleButton.addEventListener("click", () => setMode("single"));
+  refs.modeBatchButton.addEventListener("click", () => setMode("batch"));
+  refs.batchInput.addEventListener("input", refreshBatchCount);
+  refs.batchSaveButton.addEventListener("click", () => saveBatchPhrases());
+  refs.batchClearButton.addEventListener("click", () => {
+    refs.batchInput.value = "";
+    refreshBatchCount();
+  });
+  refs.batchGroupCheck.addEventListener("change", () => {
+    refs.batchGroupField.hidden = !refs.batchGroupCheck.checked;
+    if (refs.batchGroupCheck.checked) refreshBatchGroupOptions();
+  });
+
+  // Group chips + actions.
+  refs.groupChips.addEventListener("click", (event) => {
+    const drill = event.target.closest("[data-group-drill]");
+    if (drill) {
+      event.stopPropagation();
+      startDrillOnGroup(drill.dataset.groupDrill);
+      return;
+    }
+    const chip = event.target.closest("[data-group-filter]");
+    if (!chip) return;
+    state.activeGroupId = chip.dataset.groupFilter;
     renderLibrary();
   });
-  refs.drillClearButton.addEventListener("click", () => {
-    state.drillSelectedIds.clear();
-    renderLibrary();
+  refs.groupNewButton.addEventListener("click", () => createGroup());
+  refs.groupManageButton.addEventListener("click", () => openManageGroupsModal());
+
+  // Modal dismiss.
+  refs.modalRoot.addEventListener("click", (event) => {
+    if (event.target.dataset.modalDismiss !== undefined) closeModal();
   });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !refs.modalRoot.hidden) closeModal();
+  });
+}
+
+// ───── init ─────
+
+function restoreDeckSelection() {
+  try {
+    const saved = window.localStorage.getItem(ACTIVE_DECK_KEY);
+    if (saved && state.decks.find((d) => d.id === saved)) state.activeDeckId = saved;
+  } catch {}
+  if (!state.activeDeckId && state.decks.length) state.activeDeckId = state.decks[0].id;
 }
 
 async function init() {
@@ -1051,16 +1732,18 @@ async function init() {
     const bootstrap = await fetchJson(`${API_BASE}/bootstrap`);
     state.availableVoices = bootstrap.availableVoices || [];
     state.defaultVoices = bootstrap.defaultVoices || [];
-    state.phrases = bootstrap.phrases || [];
+    state.decks = bootstrap.decks || [];
     state.ttsReady = Boolean(bootstrap.ttsReady);
+    restoreDeckSelection();
 
     renderVoiceGrid();
-    refs.speedInput.value = String(bootstrap.defaultSpeed || 1);
-    state.phrases.forEach((p) => state.drillSelectedIds.add(p.id));
+    applyPreset(DEFAULT_PRESET_LABEL);
+    refs.speedInput.value = "1";
     renderLibrary();
     renderVariants();
     syncComposerMeta();
     syncDrillUI();
+    setMode("single");
 
     if (state.ttsReady) {
       setNotice("info", "AI-generated audio is ready. Build a phrase, choose your voice pack, and generate.");
@@ -1073,10 +1756,13 @@ async function init() {
   } catch (error) {
     state.availableVoices = ["cedar", "marin", "ash", "verse"];
     state.defaultVoices = ["cedar", "marin", "ash", "verse"];
+    state.decks = [];
     renderVoiceGrid();
+    applyPreset(DEFAULT_PRESET_LABEL);
     renderLibrary();
     renderVariants();
     syncComposerMeta();
+    setMode("single");
     setNotice("error", error.message || "Failed to load HVPT Voice Lab.");
   }
 }

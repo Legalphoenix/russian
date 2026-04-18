@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""HVPT phrase library and OpenAI TTS cache service."""
+"""HVPT phrase library and OpenAI TTS cache service.
+
+Schema v2: the library is a list of named decks. Each deck owns its own
+phrases plus named groups that reference phrase ids. A v1 library (flat
+phrases list) is migrated into a single default deck named "Russian" on
+first load.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +14,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
 import threading
 import time
@@ -26,12 +33,18 @@ try:
 except ImportError:  # pragma: no cover - environment dependent
     OpenAI = None
 
-MAX_REQUEST_BYTES = 128 * 1024
+MAX_REQUEST_BYTES = 1024 * 1024
 MAX_RECORDING_BYTES = 10 * 1024 * 1024
 MAX_TEXT_LENGTH = 4096
 MAX_NOTE_LENGTH = 240
 MAX_INSTRUCTIONS_LENGTH = 1200
-MAX_PHRASE_COUNT = 500
+MAX_PHRASE_COUNT = 2000
+MAX_DECK_COUNT = 40
+MAX_DECK_NAME_LENGTH = 60
+MAX_GROUP_COUNT = 100
+MAX_GROUP_NAME_LENGTH = 60
+MAX_BATCH_PHRASES = 200
+DEFAULT_DECK_NAME = "Russian"
 DEFAULT_MODEL = "gpt-4o-mini-tts-2025-12-15"
 DEFAULT_SPEED = 1.0
 DEFAULT_VOICES = ("cedar", "marin", "ash", "verse")
@@ -52,6 +65,8 @@ BUILT_IN_VOICES = (
 )
 VOICE_SET = frozenset(BUILT_IN_VOICES)
 LOG = logging.getLogger("hvpt_sync")
+
+DECK_ID_RE = re.compile(r"^[a-zA-Z0-9]+$")
 
 
 class ValidationError(ValueError):
@@ -96,11 +111,30 @@ def timestamp_label(timestamp_ms: int) -> str:
     return dt.strftime("%Y-%m-%d %H:%M UTC")
 
 
+def new_deck_id() -> str:
+    return f"d{uuid.uuid4().hex[:11]}"
+
+
+def new_group_id() -> str:
+    return f"g{uuid.uuid4().hex[:11]}"
+
+
 def create_library(now_ms: int = 0) -> dict[str, Any]:
     return {
-        "version": 1,
+        "version": 2,
+        "updatedAt": now_ms,
+        "decks": [create_deck(DEFAULT_DECK_NAME, now_ms)],
+    }
+
+
+def create_deck(name: str, now_ms: int, deck_id: str | None = None) -> dict[str, Any]:
+    return {
+        "id": deck_id or new_deck_id(),
+        "name": name,
+        "createdAt": now_ms,
         "updatedAt": now_ms,
         "phrases": [],
+        "groups": [],
     }
 
 
@@ -124,7 +158,12 @@ def validate_voice_list(value: Any) -> list[str]:
     return voices
 
 
-def validate_phrase_payload(payload: Any, *, phrase_id: str | None = None, existing_created_at: int | None = None) -> dict[str, Any]:
+def validate_phrase_payload(
+    payload: Any,
+    *,
+    phrase_id: str | None = None,
+    existing_created_at: int | None = None,
+) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValidationError("Phrase payload must be a JSON object.")
 
@@ -165,42 +204,168 @@ def validate_phrase_payload(payload: Any, *, phrase_id: str | None = None, exist
     }
 
 
+def validate_deck_name(value: Any) -> str:
+    name = normalize_text(value)
+    if not name:
+        raise ValidationError("Deck name is required.")
+    if len(name) > MAX_DECK_NAME_LENGTH:
+        raise ValidationError(f"Deck name must be at most {MAX_DECK_NAME_LENGTH} characters.")
+    return name
+
+
+def validate_group_name(value: Any) -> str:
+    name = normalize_text(value)
+    if not name:
+        raise ValidationError("Group name is required.")
+    if len(name) > MAX_GROUP_NAME_LENGTH:
+        raise ValidationError(f"Group name must be at most {MAX_GROUP_NAME_LENGTH} characters.")
+    return name
+
+
+def validate_phrase_ids(value: Any, known_ids: set[str]) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValidationError("phraseIds must be a list.")
+    result: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        pid = normalize_text(item)
+        if not pid or pid in seen:
+            continue
+        if pid not in known_ids:
+            continue
+        seen.add(pid)
+        result.append(pid)
+    return result
+
+
+def sanitize_phrase(item: Any, now_ms: int) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        return None
+    phrase_id = normalize_text(item.get("id")) or uuid.uuid4().hex[:12]
+    try:
+        sanitized = validate_phrase_payload(
+            item,
+            phrase_id=phrase_id,
+            existing_created_at=max(0, int(number_or(item.get("createdAt"), now_ms))),
+        )
+    except ValidationError:
+        return None
+    sanitized["updatedAt"] = max(
+        sanitized["createdAt"],
+        int(number_or(item.get("updatedAt"), sanitized["updatedAt"])),
+    )
+    return sanitized
+
+
+def sanitize_group(item: Any, known_ids: set[str], now_ms: int) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        return None
+    name = normalize_text(item.get("name"))
+    if not name:
+        return None
+    name = name[:MAX_GROUP_NAME_LENGTH]
+    group_id = normalize_text(item.get("id")) or new_group_id()
+    created_at = max(0, int(number_or(item.get("createdAt"), now_ms)))
+    updated_at = max(created_at, int(number_or(item.get("updatedAt"), now_ms)))
+    phrase_ids = validate_phrase_ids(item.get("phraseIds"), known_ids)
+    return {
+        "id": group_id,
+        "name": name,
+        "phraseIds": phrase_ids,
+        "createdAt": created_at,
+        "updatedAt": updated_at,
+    }
+
+
+def sanitize_deck(item: Any, now_ms: int) -> dict[str, Any] | None:
+    if not isinstance(item, dict):
+        return None
+    try:
+        name = validate_deck_name(item.get("name"))
+    except ValidationError:
+        return None
+    deck_id = normalize_text(item.get("id")) or new_deck_id()
+    created_at = max(0, int(number_or(item.get("createdAt"), now_ms)))
+    updated_at = max(created_at, int(number_or(item.get("updatedAt"), now_ms)))
+
+    phrases_raw = item.get("phrases")
+    phrases: list[dict[str, Any]] = []
+    if isinstance(phrases_raw, list):
+        seen_ids: set[str] = set()
+        for raw in phrases_raw:
+            sanitized = sanitize_phrase(raw, now_ms)
+            if sanitized is None or sanitized["id"] in seen_ids:
+                continue
+            seen_ids.add(sanitized["id"])
+            phrases.append(sanitized)
+        phrases.sort(key=lambda p: p["updatedAt"], reverse=True)
+        phrases = phrases[:MAX_PHRASE_COUNT]
+
+    known_ids = {p["id"] for p in phrases}
+    groups_raw = item.get("groups")
+    groups: list[dict[str, Any]] = []
+    if isinstance(groups_raw, list):
+        seen_gids: set[str] = set()
+        for raw in groups_raw:
+            sanitized = sanitize_group(raw, known_ids, now_ms)
+            if sanitized is None or sanitized["id"] in seen_gids:
+                continue
+            seen_gids.add(sanitized["id"])
+            groups.append(sanitized)
+        groups.sort(key=lambda g: g["createdAt"])
+        groups = groups[:MAX_GROUP_COUNT]
+
+    return {
+        "id": deck_id,
+        "name": name,
+        "createdAt": created_at,
+        "updatedAt": updated_at,
+        "phrases": phrases,
+        "groups": groups,
+    }
+
+
 def sanitize_library(payload: Any, now_ms: int | None = None) -> dict[str, Any]:
     stamp = current_time_ms() if now_ms is None else now_ms
-    base = create_library(stamp)
     if not isinstance(payload, dict):
-        return base
+        return create_library(stamp)
 
-    base["updatedAt"] = max(0, int(number_or(payload.get("updatedAt"), stamp)))
-    phrases = payload.get("phrases")
-    if not isinstance(phrases, list):
-        return base
+    version = number_or(payload.get("version"), 1)
 
-    sanitized: list[dict[str, Any]] = []
-    seen_ids: set[str] = set()
-    for item in phrases:
-        if not isinstance(item, dict):
-            continue
-        phrase_id = normalize_text(item.get("id")) or uuid.uuid4().hex[:12]
-        if phrase_id in seen_ids:
-            continue
-        try:
-            sanitized_item = validate_phrase_payload(
-                item,
-                phrase_id=phrase_id,
-                existing_created_at=max(0, int(number_or(item.get("createdAt"), stamp))),
-            )
-        except ValidationError:
-            continue
-        sanitized_item["updatedAt"] = max(
-            sanitized_item["createdAt"],
-            int(number_or(item.get("updatedAt"), sanitized_item["updatedAt"])),
-        )
-        seen_ids.add(phrase_id)
-        sanitized.append(sanitized_item)
+    # v1 migration: a flat phrases list at the root becomes the default deck.
+    if (not isinstance(payload.get("decks"), list)) and isinstance(payload.get("phrases"), list):
+        legacy_deck = {
+            "id": "default",
+            "name": DEFAULT_DECK_NAME,
+            "createdAt": stamp,
+            "updatedAt": stamp,
+            "phrases": payload.get("phrases", []),
+            "groups": [],
+        }
+        payload = {"version": 2, "updatedAt": stamp, "decks": [legacy_deck]}
 
-    base["phrases"] = sorted(sanitized, key=lambda item: item["updatedAt"], reverse=True)[:MAX_PHRASE_COUNT]
-    return base
+    decks_raw = payload.get("decks")
+    decks: list[dict[str, Any]] = []
+    if isinstance(decks_raw, list):
+        seen_ids: set[str] = set()
+        for raw in decks_raw:
+            sanitized = sanitize_deck(raw, stamp)
+            if sanitized is None or sanitized["id"] in seen_ids:
+                continue
+            seen_ids.add(sanitized["id"])
+            decks.append(sanitized)
+
+    if not decks:
+        decks = [create_deck(DEFAULT_DECK_NAME, stamp)]
+
+    decks = decks[:MAX_DECK_COUNT]
+    return {
+        "version": 2,
+        "updatedAt": max(0, int(number_or(payload.get("updatedAt"), stamp))),
+        "decks": decks,
+    }
 
 
 class PhraseStore:
@@ -218,12 +383,17 @@ class PhraseStore:
         self._lock = threading.Lock()
         self._client: OpenAI | None = None
 
+    # ───── introspection ─────
+
     def get_health(self) -> dict[str, Any]:
+        library = self._read_library()
+        total_phrases = sum(len(d["phrases"]) for d in library["decks"])
         return {
             "status": "ok",
             "dataDir": str(self.data_dir),
             "model": self.model,
-            "phraseCount": len(self.list_phrases()),
+            "deckCount": len(library["decks"]),
+            "phraseCount": total_phrases,
             "openaiInstalled": OpenAI is not None,
             "openaiConfigured": bool(normalize_text(os.environ.get("OPENAI_API_KEY"))),
             "ttsReady": self.is_tts_ready(),
@@ -233,52 +403,205 @@ class PhraseStore:
         return OpenAI is not None and bool(normalize_text(os.environ.get("OPENAI_API_KEY")))
 
     def bootstrap(self) -> dict[str, Any]:
+        library = self._read_library()
         return {
             "availableVoices": list(BUILT_IN_VOICES),
             "defaultVoices": list(DEFAULT_VOICES),
             "defaultSpeed": DEFAULT_SPEED,
             "model": self.model,
             "ttsReady": self.is_tts_ready(),
-            "phrases": self.list_phrases(),
+            "decks": library["decks"],
         }
 
-    def list_phrases(self) -> list[dict[str, Any]]:
-        with self._lock:
-            return list(self._read_library()["phrases"])
+    # ───── deck CRUD ─────
 
-    def save_phrase(self, payload: Any, phrase_id: str | None = None) -> dict[str, Any]:
+    def create_deck(self, payload: Any) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise ValidationError("Deck payload must be a JSON object.")
+        name = validate_deck_name(payload.get("name"))
         with self._lock:
             library = self._read_library()
+            if len(library["decks"]) >= MAX_DECK_COUNT:
+                raise ValidationError(f"Deck limit reached ({MAX_DECK_COUNT}).")
+            now = current_time_ms()
+            deck = create_deck(name, now)
+            library["decks"].append(deck)
+            library["updatedAt"] = now
+            self._write_library(library, create_backup=self.phrases_path.exists())
+            return deck
+
+    def rename_deck(self, deck_id: str, payload: Any) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise ValidationError("Deck payload must be a JSON object.")
+        name = validate_deck_name(payload.get("name"))
+        with self._lock:
+            library = self._read_library()
+            deck = self._find_deck(library, deck_id)
+            deck["name"] = name
+            deck["updatedAt"] = current_time_ms()
+            library["updatedAt"] = deck["updatedAt"]
+            self._write_library(library, create_backup=self.phrases_path.exists())
+            return deck
+
+    def delete_deck(self, deck_id: str) -> bool:
+        with self._lock:
+            library = self._read_library()
+            decks = library["decks"]
+            if len(decks) <= 1:
+                raise ValidationError("Cannot delete the last deck.")
+            remaining = [d for d in decks if d["id"] != deck_id]
+            if len(remaining) == len(decks):
+                return False
+            library["decks"] = remaining
+            library["updatedAt"] = current_time_ms()
+            self._write_library(library, create_backup=self.phrases_path.exists())
+            return True
+
+    # ───── phrase CRUD ─────
+
+    def save_phrase(self, deck_id: str, payload: Any, phrase_id: str | None = None) -> dict[str, Any]:
+        with self._lock:
+            library = self._read_library()
+            deck = self._find_deck(library, deck_id)
             existing = None
             if phrase_id:
-                existing = next((item for item in library["phrases"] if item["id"] == phrase_id), None)
+                existing = next((item for item in deck["phrases"] if item["id"] == phrase_id), None)
                 if existing is None:
                     raise ValidationError("Phrase not found.")
-            elif len(library["phrases"]) >= MAX_PHRASE_COUNT:
-                raise ValidationError(f"Save limit reached ({MAX_PHRASE_COUNT} phrases).")
+            elif len(deck["phrases"]) >= MAX_PHRASE_COUNT:
+                raise ValidationError(f"Save limit reached ({MAX_PHRASE_COUNT} phrases per deck).")
 
             saved = validate_phrase_payload(
                 payload,
                 phrase_id=phrase_id,
                 existing_created_at=existing["createdAt"] if existing else None,
             )
-            phrases = [item for item in library["phrases"] if item["id"] != saved["id"]]
+            phrases = [item for item in deck["phrases"] if item["id"] != saved["id"]]
             phrases.append(saved)
-            library["phrases"] = sorted(phrases, key=lambda item: item["updatedAt"], reverse=True)
-            library["updatedAt"] = current_time_ms()
+            deck["phrases"] = sorted(phrases, key=lambda item: item["updatedAt"], reverse=True)
+            deck["updatedAt"] = current_time_ms()
+            library["updatedAt"] = deck["updatedAt"]
             self._write_library(library, create_backup=self.phrases_path.exists())
             return saved
 
-    def delete_phrase(self, phrase_id: str) -> bool:
+    def save_phrases_batch(self, deck_id: str, payload: Any) -> list[dict[str, Any]]:
+        if not isinstance(payload, dict):
+            raise ValidationError("Batch payload must be a JSON object.")
+        items = payload.get("phrases")
+        if not isinstance(items, list) or not items:
+            raise ValidationError("Provide at least one phrase in the batch.")
+        if len(items) > MAX_BATCH_PHRASES:
+            raise ValidationError(f"Batch limit is {MAX_BATCH_PHRASES} phrases.")
+
         with self._lock:
             library = self._read_library()
-            phrases = [item for item in library["phrases"] if item["id"] != phrase_id]
-            if len(phrases) == len(library["phrases"]):
+            deck = self._find_deck(library, deck_id)
+            if len(deck["phrases"]) + len(items) > MAX_PHRASE_COUNT:
+                raise ValidationError(f"Deck would exceed {MAX_PHRASE_COUNT} phrases.")
+
+            created: list[dict[str, Any]] = []
+            errors: list[str] = []
+            for index, item in enumerate(items):
+                try:
+                    saved = validate_phrase_payload(item)
+                    created.append(saved)
+                except ValidationError as exc:
+                    errors.append(f"row {index + 1}: {exc}")
+
+            if errors and not created:
+                raise ValidationError("; ".join(errors))
+
+            deck["phrases"] = sorted(
+                created + deck["phrases"],
+                key=lambda p: p["updatedAt"],
+                reverse=True,
+            )
+            deck["updatedAt"] = current_time_ms()
+            library["updatedAt"] = deck["updatedAt"]
+            self._write_library(library, create_backup=self.phrases_path.exists())
+            return created
+
+    def delete_phrase(self, deck_id: str, phrase_id: str) -> bool:
+        with self._lock:
+            library = self._read_library()
+            deck = self._find_deck(library, deck_id)
+            phrases = [item for item in deck["phrases"] if item["id"] != phrase_id]
+            if len(phrases) == len(deck["phrases"]):
                 return False
-            library["phrases"] = phrases
-            library["updatedAt"] = current_time_ms()
+            deck["phrases"] = phrases
+            # Remove deleted phrase from any groups.
+            for group in deck["groups"]:
+                before = len(group["phraseIds"])
+                group["phraseIds"] = [pid for pid in group["phraseIds"] if pid != phrase_id]
+                if len(group["phraseIds"]) != before:
+                    group["updatedAt"] = current_time_ms()
+            deck["updatedAt"] = current_time_ms()
+            library["updatedAt"] = deck["updatedAt"]
             self._write_library(library, create_backup=self.phrases_path.exists())
             return True
+
+    # ───── group CRUD ─────
+
+    def create_group(self, deck_id: str, payload: Any) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise ValidationError("Group payload must be a JSON object.")
+        name = validate_group_name(payload.get("name"))
+        with self._lock:
+            library = self._read_library()
+            deck = self._find_deck(library, deck_id)
+            if len(deck["groups"]) >= MAX_GROUP_COUNT:
+                raise ValidationError(f"Group limit reached ({MAX_GROUP_COUNT}).")
+            known_ids = {p["id"] for p in deck["phrases"]}
+            phrase_ids = validate_phrase_ids(payload.get("phraseIds"), known_ids)
+            now = current_time_ms()
+            group = {
+                "id": new_group_id(),
+                "name": name,
+                "phraseIds": phrase_ids,
+                "createdAt": now,
+                "updatedAt": now,
+            }
+            deck["groups"].append(group)
+            deck["updatedAt"] = now
+            library["updatedAt"] = now
+            self._write_library(library, create_backup=self.phrases_path.exists())
+            return group
+
+    def update_group(self, deck_id: str, group_id: str, payload: Any) -> dict[str, Any]:
+        if not isinstance(payload, dict):
+            raise ValidationError("Group payload must be a JSON object.")
+        with self._lock:
+            library = self._read_library()
+            deck = self._find_deck(library, deck_id)
+            group = next((g for g in deck["groups"] if g["id"] == group_id), None)
+            if group is None:
+                raise ValidationError("Group not found.")
+
+            if "name" in payload:
+                group["name"] = validate_group_name(payload.get("name"))
+            if "phraseIds" in payload:
+                known_ids = {p["id"] for p in deck["phrases"]}
+                group["phraseIds"] = validate_phrase_ids(payload.get("phraseIds"), known_ids)
+            group["updatedAt"] = current_time_ms()
+            deck["updatedAt"] = group["updatedAt"]
+            library["updatedAt"] = group["updatedAt"]
+            self._write_library(library, create_backup=self.phrases_path.exists())
+            return group
+
+    def delete_group(self, deck_id: str, group_id: str) -> bool:
+        with self._lock:
+            library = self._read_library()
+            deck = self._find_deck(library, deck_id)
+            remaining = [g for g in deck["groups"] if g["id"] != group_id]
+            if len(remaining) == len(deck["groups"]):
+                return False
+            deck["groups"] = remaining
+            deck["updatedAt"] = current_time_ms()
+            library["updatedAt"] = deck["updatedAt"]
+            self._write_library(library, create_backup=self.phrases_path.exists())
+            return True
+
+    # ───── audio / recording ─────
 
     def generate_variants(self, payload: Any) -> dict[str, Any]:
         phrase = validate_phrase_payload(payload)
@@ -322,6 +645,17 @@ class PhraseStore:
         if path.parent != self.audio_dir.resolve() or not path.exists():
             return None
         return path
+
+    # ───── internal helpers ─────
+
+    def _find_deck(self, library: dict[str, Any], deck_id: str) -> dict[str, Any]:
+        key = normalize_text(deck_id)
+        if not key:
+            raise ValidationError("Deck id is required.")
+        deck = next((d for d in library["decks"] if d["id"] == key), None)
+        if deck is None:
+            raise ValidationError("Deck not found.")
+        return deck
 
     def _get_client(self) -> OpenAI:
         if OpenAI is None:
@@ -386,8 +720,12 @@ class PhraseStore:
 
     def _read_library(self) -> dict[str, Any]:
         if not self.phrases_path.exists():
-            return create_library(0)
-        payload = json.loads(self.phrases_path.read_text(encoding="utf-8"))
+            return create_library(current_time_ms())
+        try:
+            payload = json.loads(self.phrases_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            LOG.exception("Failed to decode %s; starting fresh library.", self.phrases_path)
+            return create_library(current_time_ms())
         return sanitize_library(payload, current_time_ms())
 
     def _write_library(self, library: dict[str, Any], create_backup: bool) -> None:
@@ -483,11 +821,6 @@ class HvptRequestHandler(SimpleHTTPRequestHandler):
                 response = self.server.store.generate_variants(payload)
                 self._write_json(HTTPStatus.OK, response)
                 return
-            if path == "/phrases":
-                payload = self._read_json_body()
-                phrase = self.server.store.save_phrase(payload)
-                self._write_json(HTTPStatus.CREATED, {"phrase": phrase})
-                return
             if path == "/recording":
                 content = self._read_raw_body(MAX_RECORDING_BYTES)
                 content_type = normalize_text(self.headers.get("Content-Type"))
@@ -501,6 +834,29 @@ class HvptRequestHandler(SimpleHTTPRequestHandler):
                     ext = ".webm"
                 result = self.server.store.save_recording(content, extension=ext)
                 self._write_json(HTTPStatus.CREATED, result)
+                return
+            if path == "/decks":
+                payload = self._read_json_body()
+                deck = self.server.store.create_deck(payload)
+                self._write_json(HTTPStatus.CREATED, {"deck": deck})
+                return
+            match = re.match(r"^/decks/([a-zA-Z0-9]+)/phrases$", path)
+            if match:
+                payload = self._read_json_body()
+                phrase = self.server.store.save_phrase(match.group(1), payload)
+                self._write_json(HTTPStatus.CREATED, {"phrase": phrase})
+                return
+            match = re.match(r"^/decks/([a-zA-Z0-9]+)/phrases/batch$", path)
+            if match:
+                payload = self._read_json_body()
+                phrases = self.server.store.save_phrases_batch(match.group(1), payload)
+                self._write_json(HTTPStatus.CREATED, {"phrases": phrases})
+                return
+            match = re.match(r"^/decks/([a-zA-Z0-9]+)/groups$", path)
+            if match:
+                payload = self._read_json_body()
+                group = self.server.store.create_group(match.group(1), payload)
+                self._write_json(HTTPStatus.CREATED, {"group": group})
                 return
         except ValidationError as exc:
             self._write_error(HTTPStatus.BAD_REQUEST, str(exc))
@@ -520,37 +876,76 @@ class HvptRequestHandler(SimpleHTTPRequestHandler):
 
     def do_PUT(self) -> None:  # noqa: N802
         path = self._normalize_api_path(urlsplit(self.path).path)
-        prefix = "/phrases/"
-        if not path.startswith(prefix):
-            self._write_error(HTTPStatus.NOT_FOUND, "Not found.")
-            return
-
-        phrase_id = normalize_text(path.removeprefix(prefix))
         try:
-            payload = self._read_json_body()
-            phrase = self.server.store.save_phrase(payload, phrase_id=phrase_id)
-            self._write_json(HTTPStatus.OK, {"phrase": phrase})
+            match = re.match(r"^/decks/([a-zA-Z0-9]+)$", path)
+            if match:
+                payload = self._read_json_body()
+                deck = self.server.store.rename_deck(match.group(1), payload)
+                self._write_json(HTTPStatus.OK, {"deck": deck})
+                return
+            match = re.match(r"^/decks/([a-zA-Z0-9]+)/phrases/([A-Za-z0-9]+)$", path)
+            if match:
+                payload = self._read_json_body()
+                phrase = self.server.store.save_phrase(
+                    match.group(1), payload, phrase_id=match.group(2)
+                )
+                self._write_json(HTTPStatus.OK, {"phrase": phrase})
+                return
+            match = re.match(r"^/decks/([a-zA-Z0-9]+)/groups/([A-Za-z0-9]+)$", path)
+            if match:
+                payload = self._read_json_body()
+                group = self.server.store.update_group(match.group(1), match.group(2), payload)
+                self._write_json(HTTPStatus.OK, {"group": group})
+                return
         except ValidationError as exc:
             self._write_error(HTTPStatus.BAD_REQUEST, str(exc))
+            return
         except json.JSONDecodeError:
             self._write_error(HTTPStatus.BAD_REQUEST, "Request body must be valid JSON.")
-        except Exception as exc:  # pragma: no cover - depends on filesystem state
+            return
+        except Exception as exc:  # pragma: no cover
             LOG.exception("PUT handler failed.")
             self._write_error(HTTPStatus.BAD_GATEWAY, self._error_message(exc))
+            return
+
+        self._write_error(HTTPStatus.NOT_FOUND, "Not found.")
 
     def do_DELETE(self) -> None:  # noqa: N802
         path = self._normalize_api_path(urlsplit(self.path).path)
-        prefix = "/phrases/"
-        if not path.startswith(prefix):
-            self._write_error(HTTPStatus.NOT_FOUND, "Not found.")
+        try:
+            match = re.match(r"^/decks/([a-zA-Z0-9]+)$", path)
+            if match:
+                deleted = self.server.store.delete_deck(match.group(1))
+                if not deleted:
+                    self._write_error(HTTPStatus.NOT_FOUND, "Deck not found.")
+                    return
+                self._write_json(HTTPStatus.OK, {"deleted": True, "id": match.group(1)})
+                return
+            match = re.match(r"^/decks/([a-zA-Z0-9]+)/phrases/([A-Za-z0-9]+)$", path)
+            if match:
+                deleted = self.server.store.delete_phrase(match.group(1), match.group(2))
+                if not deleted:
+                    self._write_error(HTTPStatus.NOT_FOUND, "Phrase not found.")
+                    return
+                self._write_json(HTTPStatus.OK, {"deleted": True, "id": match.group(2)})
+                return
+            match = re.match(r"^/decks/([a-zA-Z0-9]+)/groups/([A-Za-z0-9]+)$", path)
+            if match:
+                deleted = self.server.store.delete_group(match.group(1), match.group(2))
+                if not deleted:
+                    self._write_error(HTTPStatus.NOT_FOUND, "Group not found.")
+                    return
+                self._write_json(HTTPStatus.OK, {"deleted": True, "id": match.group(2)})
+                return
+        except ValidationError as exc:
+            self._write_error(HTTPStatus.BAD_REQUEST, str(exc))
+            return
+        except Exception as exc:  # pragma: no cover
+            LOG.exception("DELETE handler failed.")
+            self._write_error(HTTPStatus.BAD_GATEWAY, self._error_message(exc))
             return
 
-        phrase_id = normalize_text(path.removeprefix(prefix))
-        deleted = self.server.store.delete_phrase(phrase_id)
-        if not deleted:
-            self._write_error(HTTPStatus.NOT_FOUND, "Phrase not found.")
-            return
-        self._write_json(HTTPStatus.OK, {"deleted": True, "id": phrase_id})
+        self._write_error(HTTPStatus.NOT_FOUND, "Not found.")
 
     def _handle_audio(self, file_name: str) -> None:
         path = self.server.store.audio_path_for_name(file_name)

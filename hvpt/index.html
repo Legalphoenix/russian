@@ -41,9 +41,24 @@
           <p class="eyebrow">High-Variability Phonetic Training</p>
           <h1>One phrase. Many voices. Fast ear work.</h1>
           <p class="lede">
-            Build a compact listening bank for the exact Russian lines you are studying. Generate the same phrase
+            Build a compact listening bank for the exact lines you are studying. Generate the same phrase
             across multiple OpenAI voices, steer the delivery, and save the phrase to return to later.
           </p>
+        </div>
+        <div class="deck-bar" role="toolbar" aria-label="Deck switcher">
+          <span class="deck-bar-label">Deck</span>
+          <div class="deck-select-wrap">
+            <select id="deck-select" class="deck-select" aria-label="Active deck"></select>
+          </div>
+          <button id="deck-menu-button" class="mini-button deck-menu-button" type="button" aria-haspopup="true" aria-expanded="false" title="Deck options">
+            <span aria-hidden="true">⋯</span>
+            <span class="sr-only">Deck options</span>
+          </button>
+          <div id="deck-menu" class="deck-menu" hidden>
+            <button type="button" class="deck-menu-item" data-deck-action="new">+ New deck…</button>
+            <button type="button" class="deck-menu-item" data-deck-action="rename">Rename current</button>
+            <button type="button" class="deck-menu-item is-danger" data-deck-action="delete">Delete current</button>
+          </div>
         </div>
       </header>
 
@@ -59,24 +74,59 @@
 
         <div id="notice" class="notice" aria-live="polite"></div>
 
-        <label class="field">
-          <span class="field-label">Russian phrase</span>
-          <textarea
-            id="phrase-input"
-            class="text-area"
-            rows="3"
-            placeholder="Мне нужно купить билет."
-            spellcheck="false"
-            autocapitalize="off"
-            autocomplete="off"
-            autocorrect="off"
-          ></textarea>
-        </label>
+        <div class="mode-toggle" role="tablist" aria-label="Phrase entry mode">
+          <button id="mode-single-button" class="mode-toggle-button is-active" type="button" role="tab" aria-selected="true" data-mode="single">Single</button>
+          <button id="mode-batch-button" class="mode-toggle-button" type="button" role="tab" aria-selected="false" data-mode="batch">Batch paste</button>
+        </div>
 
-        <label class="field">
-          <span class="field-label">English / note</span>
-          <input id="note-input" class="text-input" type="text" placeholder="I need to buy a ticket." />
-        </label>
+        <div id="single-mode" class="mode-panel">
+          <label class="field">
+            <span class="field-label">Target phrase</span>
+            <textarea
+              id="phrase-input"
+              class="text-area"
+              rows="3"
+              placeholder="Мне нужно купить билет."
+              spellcheck="false"
+              autocapitalize="off"
+              autocomplete="off"
+              autocorrect="off"
+            ></textarea>
+          </label>
+
+          <label class="field">
+            <span class="field-label">English / note</span>
+            <input id="note-input" class="text-input" type="text" placeholder="I need to buy a ticket." />
+          </label>
+        </div>
+
+        <div id="batch-mode" class="mode-panel" hidden>
+          <label class="field">
+            <span class="field-label">Paste phrases (one per line)</span>
+            <textarea
+              id="batch-input"
+              class="text-area"
+              rows="8"
+              placeholder="Мне нужно купить билет. | I need to buy a ticket.&#10;На завтрак я съел яйца. | I had eggs for breakfast.&#10;&#10;Or use tabs between target and English — Anki style."
+              spellcheck="false"
+              autocapitalize="off"
+              autocomplete="off"
+              autocorrect="off"
+            ></textarea>
+          </label>
+          <div class="batch-meta">
+            <span id="batch-count" class="subpanel-note">0 phrases detected.</span>
+            <span class="subpanel-note">Separator: <code>|</code>, tab, or <code>=</code>. English is optional.</span>
+          </div>
+          <label class="field inline-field">
+            <input id="batch-group-check" type="checkbox" />
+            <span>Add to a group after saving…</span>
+          </label>
+          <label class="field inline-field" id="batch-group-field" hidden>
+            <span class="field-label">Group</span>
+            <select id="batch-group-select" class="text-input"></select>
+          </label>
+        </div>
 
         <div class="tuning-grid">
           <section class="subpanel">
@@ -137,11 +187,15 @@
           <div id="voice-grid" class="voice-grid"></div>
         </section>
 
-        <div class="action-row">
+        <div class="action-row" id="single-actions">
           <button id="generate-button" class="primary-button" type="button">Generate voice pack</button>
           <button id="save-button" class="ghost-button" type="button">Save phrase</button>
           <button id="update-button" class="ghost-button" type="button" hidden>Update loaded phrase</button>
           <button id="new-button" class="ghost-button" type="button">New phrase</button>
+        </div>
+        <div class="action-row" id="batch-actions" hidden>
+          <button id="batch-save-button" class="primary-button" type="button">Save all phrases</button>
+          <button id="batch-clear-button" class="ghost-button" type="button">Clear</button>
         </div>
       </section>
 
@@ -174,19 +228,35 @@
           <span id="library-count" class="section-note">0 saved phrases</span>
         </div>
 
-        <div class="drill-toolbar">
-          <button id="drill-start-button" class="primary-button" type="button">Start drill</button>
-          <button id="drill-stop-button" class="ghost-button" type="button" hidden>Stop drill</button>
+        <div class="group-bar">
+          <div id="group-chips" class="group-chips" aria-label="Groups"></div>
           <div class="inline-actions">
-            <button id="drill-select-all-button" class="mini-button" type="button">Select all</button>
-            <button id="drill-clear-button" class="mini-button" type="button">Clear</button>
+            <button id="group-new-button" class="mini-button" type="button">+ New group</button>
+            <button id="group-manage-button" class="mini-button" type="button" hidden>Manage</button>
           </div>
+        </div>
+
+        <div class="drill-toolbar">
+          <button id="drill-start-button" class="primary-button" type="button">▶ Start drill</button>
+          <button id="drill-stop-button" class="ghost-button" type="button" hidden>Stop drill</button>
         </div>
         <div id="drill-status" class="drill-status"></div>
         <audio id="drill-audio" preload="auto" style="display:none"></audio>
 
         <div id="library-list" class="library-list"></div>
       </section>
+
+      <div id="modal-root" class="modal-root" hidden>
+        <div class="modal-backdrop" data-modal-dismiss></div>
+        <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+          <div class="modal-head">
+            <h3 id="modal-title" class="modal-title">Title</h3>
+            <button class="mini-button modal-close" type="button" data-modal-dismiss>Close</button>
+          </div>
+          <div id="modal-body" class="modal-body"></div>
+          <div id="modal-actions" class="modal-actions"></div>
+        </div>
+      </div>
       </div><!-- .sidebar -->
       </div><!-- .main-grid -->
 
