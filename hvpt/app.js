@@ -275,10 +275,16 @@ function renderGroupChips() {
   refs.groupManageButton.hidden = groups.length === 0;
 
   const allSelected = state.activeGroupId === "" ? " is-active" : "";
+  const allDrilling = state.drillActive && state.drillGroupId === "";
+  const allDrillClass = allDrilling ? " is-drilling" : "";
+  const allDrillIcon = allDrilling ? "⏹" : "▶";
+  const allDrillLabel = allDrilling ? "Stop drill on all phrases" : "Drill all phrases";
+  const allDrillTitle = allDrilling ? "Stop drill" : "Start drill";
   const chips = [
     `<button class="group-chip${allSelected}" type="button" data-group-filter="">
        <span class="group-chip-name">All</span>
        <span class="group-chip-count">${deck.phrases.length}</span>
+       <span class="group-chip-drill${allDrillClass}" data-group-drill="" role="button" aria-label="${escapeHtml(allDrillLabel)}" title="${allDrillTitle}">${allDrillIcon}</span>
      </button>`,
   ];
   for (const group of groups) {
@@ -525,7 +531,7 @@ function renderLibrary() {
   }
 
   const groupLookup = new Map(deckGroups.map((g) => [g.id, g]));
-  const inGroupView = Boolean(state.activeGroupId);
+  const inGroupView = filteredPhrases.length > 0;
 
   let toolbarHtml = "";
   if (inGroupView) {
@@ -1371,15 +1377,27 @@ async function startDrillWithPhrases(phrases, label) {
 
 function startDrillOnGroup(groupId) {
   const deck = getActiveDeck();
-  const group = deck?.groups.find((g) => g.id === groupId);
-  if (!group) return;
-  const phraseById = new Map(deck.phrases.map((p) => [p.id, p]));
-  const allInGroup = group.phraseIds.map((id) => phraseById.get(id)).filter(Boolean);
-  const phrases = state.activeGroupId === groupId
-    ? allInGroup.filter((p) => !state.drillExcluded.has(p.id))
-    : allInGroup;
-  state.drillGroupId = group.id;
-  startDrillWithPhrases(phrases, group.name);
+  if (!deck) return;
+  let phrases;
+  let label;
+  if (!groupId) {
+    const all = deck.phrases;
+    phrases = state.activeGroupId === ""
+      ? all.filter((p) => !state.drillExcluded.has(p.id))
+      : all;
+    label = "All";
+  } else {
+    const group = deck.groups.find((g) => g.id === groupId);
+    if (!group) return;
+    const phraseById = new Map(deck.phrases.map((p) => [p.id, p]));
+    const allInGroup = group.phraseIds.map((id) => phraseById.get(id)).filter(Boolean);
+    phrases = state.activeGroupId === groupId
+      ? allInGroup.filter((p) => !state.drillExcluded.has(p.id))
+      : allInGroup;
+    label = group.name;
+  }
+  state.drillGroupId = groupId;
+  startDrillWithPhrases(phrases, label);
 }
 
 function toggleGroupDrill(groupId) {
