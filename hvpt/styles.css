@@ -1208,6 +1208,32 @@ button:disabled {
   cursor: pointer;
 }
 
+.wait-slider {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.wait-slider-label {
+  letter-spacing: 0.02em;
+}
+
+.wait-slider input[type="range"] {
+  width: 84px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.wait-slider-value {
+  min-width: 28px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
 .shuffle-toggle.is-active {
   background: var(--accent);
   color: #fff;

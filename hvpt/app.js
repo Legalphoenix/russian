@@ -56,6 +56,7 @@ const state = {
   drillGroupId: "",
   drillExcluded: new Set(),
   drillShuffle: false,
+  drillWaitSeconds: 0,
   previewPhraseId: "",
 };
 
@@ -87,6 +88,8 @@ const refs = {
   libraryList: document.getElementById("library-list"),
   recordButton: document.getElementById("record-button"),
   shuffleToggleButton: document.getElementById("shuffle-toggle-button"),
+  drillWaitInput: document.getElementById("drill-wait-input"),
+  drillWaitValue: document.getElementById("drill-wait-value"),
   drillStatus: document.getElementById("drill-status"),
   drillAudio: document.getElementById("drill-audio"),
   previewAudio: document.getElementById("preview-audio"),
@@ -1358,7 +1361,8 @@ async function startDrillWithPhrases(phrases, label) {
 
         if (token !== state.drillToken) return;
 
-        await new Promise((r) => setTimeout(r, 800));
+        const waitMs = Math.max(0, state.drillWaitSeconds) * 1000;
+        await new Promise((r) => setTimeout(r, waitMs || 300));
       }
     }
   } catch (error) {
@@ -1933,6 +1937,18 @@ function bindEvents() {
     syncDrillUI();
     setNotice("info", state.drillShuffle ? "Shuffle on — order randomized each cycle." : "Shuffle off — phrases play in saved order.");
   });
+
+  if (refs.drillWaitInput) {
+    const formatWait = (v) => {
+      const n = Number(v) || 0;
+      return Number.isInteger(n) ? `${n}s` : `${n.toFixed(1)}s`;
+    };
+    refs.drillWaitInput.addEventListener("input", () => {
+      const v = Number(refs.drillWaitInput.value) || 0;
+      state.drillWaitSeconds = v;
+      if (refs.drillWaitValue) refs.drillWaitValue.textContent = formatWait(v);
+    });
+  }
 
   // Deck switcher.
   refs.deckSelect.addEventListener("change", () => switchDeck(refs.deckSelect.value));

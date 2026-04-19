@@ -232,6 +232,11 @@
         <div class="group-bar">
           <div id="group-chips" class="group-chips" aria-label="Groups"></div>
           <div class="inline-actions">
+            <label class="wait-slider" title="Pause between phrases during drill">
+              <span class="wait-slider-label">Pause</span>
+              <input id="drill-wait-input" type="range" min="0" max="10" step="0.5" value="0" aria-label="Pause between phrases in seconds" />
+              <span id="drill-wait-value" class="wait-slider-value">0s</span>
+            </label>
             <button id="shuffle-toggle-button" class="mini-button shuffle-toggle" type="button" aria-pressed="false" title="Shuffle drill order">Shuffle</button>
             <button id="group-new-button" class="mini-button" type="button">+ New group</button>
             <button id="group-manage-button" class="mini-button" type="button" hidden>Manage</button>
