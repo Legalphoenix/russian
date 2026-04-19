@@ -196,6 +196,8 @@ button {
 .hero {
   display: grid;
   gap: 14px;
+  position: relative;
+  z-index: 50;
 }
 
 .hero-copy {
