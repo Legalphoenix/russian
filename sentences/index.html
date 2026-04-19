@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta
       name="description"
-      content="Russian sentence typing practice with copy and flash recall modes."
+      content="Russian sentence typing practice with see, flash, and listen modes."
     />
     <title>Russian Sentence Coach</title>
     <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
@@ -32,7 +32,7 @@
         <div class="hero-copy">
           <p class="eyebrow">Sentence practice</p>
           <h1>Russian Sentence Coach</h1>
-          <p class="hero-text">Copy it or flash it, then type it in Russian.</p>
+          <p class="hero-text">Your own sentences. See, flash, or listen — then type it in Russian.</p>
           <div class="hero-actions">
             <button id="start-button" class="button button-primary" type="button" aria-keyshortcuts="Space">Start</button>
 
@@ -56,9 +56,9 @@
 
         <div class="hero-metrics">
           <div class="metric-block">
-            <span class="metric-label">Sentence bank</span>
-            <strong id="coverage-count">0 / 20</strong>
-            <span id="coverage-detail" class="metric-detail">Tutor bank.</span>
+            <span class="metric-label">Active bank</span>
+            <strong id="coverage-count">0 sentences</strong>
+            <span id="coverage-detail" class="metric-detail">Add your own or pull from HVPT.</span>
           </div>
 
           <div class="metric-block">
@@ -80,13 +80,23 @@
           </div>
 
           <div class="control-stack">
-            <div class="mode-picker" role="radiogroup" aria-label="Sentence practice modes">
-              <button class="mode-chip is-active" type="button" data-mode="copy" aria-pressed="true">Copy</button>
-              <button class="mode-chip" type="button" data-mode="flash" aria-pressed="false">Flash</button>
+            <div class="mode-picker" role="radiogroup" aria-label="Practice modes">
+              <button class="mode-chip is-active" type="button" data-mode="copy" aria-pressed="true">
+                <span class="mode-chip-title">See</span>
+                <span class="mode-chip-hint">Read the sentence, type it.</span>
+              </button>
+              <button class="mode-chip" type="button" data-mode="flash" aria-pressed="false">
+                <span class="mode-chip-title">Flash</span>
+                <span class="mode-chip-hint">Preview, then recall from memory.</span>
+              </button>
+              <button class="mode-chip" type="button" data-mode="listen" aria-pressed="false">
+                <span class="mode-chip-title">Listen</span>
+                <span class="mode-chip-hint">Hear it, type what you heard.</span>
+              </button>
             </div>
 
-            <div class="settings-row">
-              <div class="setting-card">
+            <div id="settings-row" class="settings-row hidden">
+              <div id="flash-words-setting" class="setting-card">
                 <span class="setting-label">Flash words</span>
                 <div class="stepper" aria-label="Hidden word count">
                   <button id="missing-minus" class="stepper-button" type="button" aria-label="Decrease hidden words">
@@ -99,7 +109,7 @@
                 </div>
               </div>
 
-              <div class="setting-card">
+              <div id="preview-setting" class="setting-card">
                 <span class="setting-label">Preview</span>
                 <div class="stepper" aria-label="Preview seconds">
                   <button id="preview-minus" class="stepper-button" type="button" aria-label="Decrease preview seconds">
@@ -107,6 +117,19 @@
                   </button>
                   <strong id="preview-seconds">3s</strong>
                   <button id="preview-plus" class="stepper-button" type="button" aria-label="Increase preview seconds">
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div id="replay-setting" class="setting-card hidden">
+                <span class="setting-label">Replays</span>
+                <div class="stepper" aria-label="Audio replays">
+                  <button id="replay-minus" class="stepper-button" type="button" aria-label="Decrease replays">
+                    −
+                  </button>
+                  <strong id="replay-limit">3</strong>
+                  <button id="replay-plus" class="stepper-button" type="button" aria-label="Increase replays">
                     +
                   </button>
                 </div>
@@ -119,9 +142,16 @@
               <p class="section-label">Prompt</p>
               <span id="countdown-pill" class="countdown-pill">Ready</span>
             </div>
-            <p id="english-gloss" class="english-gloss">Start to load the first sentence.</p>
+            <p id="english-gloss" class="english-gloss">Pick a source to load sentences.</p>
             <div id="sentence-display" class="sentence-display">Press Start to begin.</div>
             <div id="hidden-words-row" class="hidden-words-row hidden"></div>
+            <div id="audio-stage" class="audio-stage hidden">
+              <button id="audio-play" class="audio-button" type="button">
+                <span class="audio-glyph" aria-hidden="true">▶</span>
+                <span class="audio-label">Play audio</span>
+              </button>
+              <span id="audio-replay-info" class="audio-replay-info">0 of 3 plays</span>
+            </div>
           </div>
 
           <div id="result-card" class="result-card hidden" aria-live="polite">
@@ -217,8 +247,8 @@
             <div class="stat-tile accent-ink">
               <span class="tile-label">Lifetime avg</span>
               <strong id="lifetime-average-accuracy">0%</strong>
-              <span class="tile-foot" id="lifetime-average-speed">0 WPM lifetime speed</span>
-              <span class="tile-foot" id="lifetime-totals">0 attempts | 0s studied</span>
+              <span class="tile-foot" id="lifetime-average-speed">0 WPM lifetime</span>
+              <span class="tile-foot" id="lifetime-totals">0 attempts · 0s studied</span>
             </div>
           </div>
 
@@ -235,30 +265,71 @@
         </article>
       </section>
 
-      <section class="bottom-grid">
-        <article class="mode-scoreboard card reveal">
-          <div class="panel-header">
+      <section class="library-grid">
+        <article class="library card reveal">
+          <div class="library-header">
             <div>
-              <p class="section-label">Lane totals</p>
-              <h2>Copy and flash</h2>
+              <p class="section-label">Library</p>
+              <h2>Sentence bank</h2>
             </div>
-            <span class="focus-caption">At a glance.</span>
+            <div class="library-header-actions">
+              <div class="order-toggle" role="radiogroup" aria-label="Order mode">
+                <button class="order-chip is-active" type="button" data-order="shuffle" aria-pressed="true">Shuffle</button>
+                <button class="order-chip" type="button" data-order="sequential" aria-pressed="false">In order</button>
+              </div>
+            </div>
           </div>
-          <div id="mode-stats-grid" class="mode-stats-grid"></div>
-        </article>
 
-        <article class="sentence-bank card reveal">
-          <div class="panel-header">
-            <div>
-              <p class="section-label">Sentence bank</p>
-              <h2>Current vocabulary</h2>
+          <div class="source-row">
+            <div class="source-tabs" role="radiogroup" aria-label="Sentence source">
+              <button class="source-tab is-active" type="button" data-source="custom" aria-pressed="true">My sentences</button>
+              <button class="source-tab" type="button" data-source="hvpt" aria-pressed="false">HVPT deck</button>
             </div>
-            <span class="focus-caption">Tutor lines.</span>
+
+            <div id="hvpt-picker" class="hvpt-picker hidden">
+              <label class="hvpt-picker-label" for="hvpt-deck-select">Deck</label>
+              <select id="hvpt-deck-select" class="hvpt-select" aria-label="HVPT deck"></select>
+              <label class="hvpt-picker-label" for="hvpt-group-select">Group</label>
+              <select id="hvpt-group-select" class="hvpt-select" aria-label="HVPT group"></select>
+              <span id="hvpt-status" class="hvpt-status">Loading…</span>
+            </div>
           </div>
-          <div id="sentence-bank" class="sentence-bank-grid"></div>
+
+          <div id="add-form" class="add-form">
+            <div class="add-form-row">
+              <input
+                id="add-russian"
+                class="add-input"
+                type="text"
+                placeholder="Russian sentence, e.g. Я хочу спать."
+                spellcheck="false"
+                autocomplete="off"
+                autocorrect="off"
+              />
+              <input
+                id="add-english"
+                class="add-input"
+                type="text"
+                placeholder="English gloss (optional)"
+                autocomplete="off"
+              />
+              <button id="add-button" class="button button-primary" type="button">Add</button>
+            </div>
+            <p id="add-hint" class="add-hint">Press Enter to add. Sentences save across devices.</p>
+          </div>
+
+          <div class="library-summary">
+            <span id="library-count">0 sentences</span>
+            <span id="library-queue" class="library-queue hidden"></span>
+          </div>
+
+          <div id="sentence-list" class="sentence-list"></div>
+          <p id="library-empty" class="library-empty hidden">No sentences here yet.</p>
         </article>
       </section>
     </main>
+
+    <audio id="audio-player" preload="auto"></audio>
 
     <script src="./app.js"></script>
   </body>

@@ -1,5 +1,7 @@
-const STORAGE_KEY = "russian-sentence-coach-state-v1";
+const STORAGE_KEY = "russian-sentence-coach-state-v2";
+const LEGACY_STORAGE_KEY = "russian-sentence-coach-state-v1";
 const REMOTE_PROGRESS_URL = "./api/progress";
+const HVPT_API_BASE = "../hvpt/api";
 const CLEAN_THRESHOLD = 98;
 const HISTORY_LIMIT = 240;
 const RECENT_WINDOW = 8;
@@ -7,166 +9,37 @@ const MIN_PREVIEW_SECONDS = 1;
 const MAX_PREVIEW_SECONDS = 6;
 const DEFAULT_PREVIEW_SECONDS = 3;
 const MAX_HIDDEN_WORDS = 6;
+const MIN_REPLAY_LIMIT = 1;
+const MAX_REPLAY_LIMIT = 8;
+const DEFAULT_REPLAY_LIMIT = 3;
+const MAX_CUSTOM_SENTENCES = 1000;
 const MASTERED_AVERAGE_ACCURACY = 96;
 const MASTERED_MIN_ATTEMPTS = 3;
-const MODE_ORDER = ["copy", "single", "multi"];
-const UI_MODE_ORDER = ["copy", "flash"];
+const MODE_ORDER = ["copy", "flash", "listen"];
+const SOURCE_ORDER = ["custom", "hvpt"];
 const NO_SPACE_BEFORE = new Set([",", ".", "!", "?", ";", ":"]);
 const STOPWORDS = new Set([
-  "а",
-  "в",
-  "во",
-  "и",
-  "из",
-  "как",
-  "мне",
-  "мы",
-  "на",
-  "не",
-  "но",
-  "она",
-  "они",
-  "с",
-  "ты",
-  "у",
-  "я",
+  "а","в","во","и","из","как","мне","мы","на","не","но","она","они","с","ты","у","я",
 ]);
 
 const MODE_META = {
   copy: {
-    label: "Copy",
+    label: "See",
     title: "Visible sentence",
     summary: "Type what you see.",
-  },
-  single: {
-    label: "Flash",
-    title: "One missing word",
-    summary: "One word hidden.",
-  },
-  multi: {
-    label: "Flash",
-    title: "Several missing words",
-    summary: "Several words hidden.",
-  },
-};
-
-const UI_MODE_META = {
-  copy: {
-    label: "Copy",
-    title: "Visible",
-    summary: "Type the full line.",
   },
   flash: {
     label: "Flash",
     title: "Preview + recall",
-    summary: "Preview it, then type from memory.",
+    summary: "Memorize in the preview, then type from memory.",
+  },
+  listen: {
+    label: "Listen",
+    title: "Audio only",
+    summary: "Listen, then type what you heard.",
   },
 };
 
-const SENTENCES = [
-  {
-    id: "good-morning",
-    text: "Доброе утро!",
-    english: "Good morning!",
-  },
-  {
-    id: "how-are-things",
-    text: "Как у тебя дела?",
-    english: "How are things with you?",
-  },
-  {
-    id: "thirty-two",
-    text: "Мне тридцать два.",
-    english: "I am thirty-two.",
-  },
-  {
-    id: "live-in-sweden",
-    text: "Я живу в Швеции.",
-    english: "I live in Sweden.",
-  },
-  {
-    id: "home-now",
-    text: "Я дома сейчас.",
-    english: "I am at home now.",
-  },
-  {
-    id: "gym-after-dinner",
-    text: "Я иду в спортзал после ужина.",
-    english: "I go to the gym after dinner.",
-  },
-  {
-    id: "beer-with-friends",
-    text: "Мы пьём пиво с друзьями.",
-    english: "We drink beer with friends.",
-  },
-  {
-    id: "music-at-her-place",
-    text: "Мы слушаем музыку у неё дома.",
-    english: "We listen to music at her place.",
-  },
-  {
-    id: "friend-of-friend",
-    text: "Она подруга моей подруги.",
-    english: "She is a friend of my friend.",
-  },
-  {
-    id: "i-want-sleep",
-    text: "Я хочу спать.",
-    english: "I want to sleep.",
-  },
-  {
-    id: "woke-up-at-one",
-    text: "Я проснулся в час.",
-    english: "I woke up at one o'clock.",
-  },
-  {
-    id: "breakfast-question",
-    text: "Что ты ел на завтрак?",
-    english: "What did you eat for breakfast?",
-  },
-  {
-    id: "breakfast-eggs-bread",
-    text: "На завтрак я ел яйца и хлеб.",
-    english: "For breakfast I ate eggs and bread.",
-  },
-  {
-    id: "fish-for-dinner",
-    text: "Мы ели рыбу на ужин.",
-    english: "We ate fish for dinner.",
-  },
-  {
-    id: "was-it-tasty",
-    text: "Было вкусно?",
-    english: "Was it tasty?",
-  },
-  {
-    id: "never-work-home",
-    text: "Я никогда не работаю дома.",
-    english: "I never work at home.",
-  },
-  {
-    id: "you-listen-home",
-    text: "Вы слушаете музыку дома.",
-    english: "You listen to music at home.",
-  },
-  {
-    id: "football-tuesday",
-    text: "Они играют в футбол во вторник.",
-    english: "They play football on Tuesday.",
-  },
-  {
-    id: "day-of-week",
-    text: "Какой сегодня день недели?",
-    english: "What day of the week is it today?",
-  },
-  {
-    id: "what-time-now",
-    text: "Который час сейчас?",
-    english: "What time is it now?",
-  },
-];
-
-const SENTENCE_IDS = new Set(SENTENCES.map((sentence) => sentence.id));
 const elements = {
   startButton: document.getElementById("start-button"),
   heroSessionActions: document.getElementById("hero-session-actions"),
@@ -184,6 +57,10 @@ const elements = {
   englishGloss: document.getElementById("english-gloss"),
   sentenceDisplay: document.getElementById("sentence-display"),
   hiddenWordsRow: document.getElementById("hidden-words-row"),
+  audioStage: document.getElementById("audio-stage"),
+  audioPlayButton: document.getElementById("audio-play"),
+  audioReplayInfo: document.getElementById("audio-replay-info"),
+  audioPlayer: document.getElementById("audio-player"),
   sentenceInput: document.getElementById("sentence-input"),
   liveTimer: document.getElementById("live-timer"),
   attemptErrors: document.getElementById("attempt-errors"),
@@ -201,7 +78,7 @@ const elements = {
   resultMetrics: document.getElementById("result-metrics"),
   resultDiff: document.getElementById("result-diff"),
   advanceButton: document.getElementById("advance-button"),
-  replayButton: document.getElementById("replay-button"),
+  replayCurrentButton: document.getElementById("replay-button"),
   sessionBadge: document.getElementById("session-badge"),
   sessionAttempts: document.getElementById("session-attempts"),
   sessionCleanRate: document.getElementById("session-clean-rate"),
@@ -213,82 +90,97 @@ const elements = {
   lifetimeAverageSpeed: document.getElementById("lifetime-average-speed"),
   lifetimeTotals: document.getElementById("lifetime-totals"),
   focusSentences: document.getElementById("focus-sentences"),
-  modeStatsGrid: document.getElementById("mode-stats-grid"),
-  sentenceBank: document.getElementById("sentence-bank"),
-  settingsRow: document.querySelector(".settings-row"),
+  settingsRow: document.getElementById("settings-row"),
+  flashWordsSetting: document.getElementById("flash-words-setting"),
+  previewSetting: document.getElementById("preview-setting"),
+  replaySetting: document.getElementById("replay-setting"),
   missingMinus: document.getElementById("missing-minus"),
   missingPlus: document.getElementById("missing-plus"),
   missingCount: document.getElementById("missing-count"),
   previewMinus: document.getElementById("preview-minus"),
   previewPlus: document.getElementById("preview-plus"),
   previewSeconds: document.getElementById("preview-seconds"),
-  modeButtons: Array.from(document.querySelectorAll("[data-mode]")),
+  replayMinus: document.getElementById("replay-minus"),
+  replayPlus: document.getElementById("replay-plus"),
+  replayLimit: document.getElementById("replay-limit"),
+  modeButtons: Array.from(document.querySelectorAll(".mode-chip[data-mode]")),
+  sourceButtons: Array.from(document.querySelectorAll(".source-tab[data-source]")),
+  orderButtons: Array.from(document.querySelectorAll(".order-chip[data-order]")),
+  hvptPicker: document.getElementById("hvpt-picker"),
+  hvptDeckSelect: document.getElementById("hvpt-deck-select"),
+  hvptGroupSelect: document.getElementById("hvpt-group-select"),
+  hvptStatus: document.getElementById("hvpt-status"),
+  addForm: document.getElementById("add-form"),
+  addRussian: document.getElementById("add-russian"),
+  addEnglish: document.getElementById("add-english"),
+  addButton: document.getElementById("add-button"),
+  addHint: document.getElementById("add-hint"),
+  libraryCount: document.getElementById("library-count"),
+  libraryQueue: document.getElementById("library-queue"),
+  libraryEmpty: document.getElementById("library-empty"),
+  sentenceList: document.getElementById("sentence-list"),
 };
 
 let state = loadState();
 let session = createSession();
 let currentAttempt = null;
+let queuedSentenceKey = "";
 let liveInterval = 0;
 let remoteSaveChain = Promise.resolve();
 let keyboardOpen = false;
 let visualViewportBaseline = window.visualViewport?.height || window.innerHeight;
+let speechVoice = null;
+let speechVoicesLoaded = false;
+const hvpt = {
+  loading: false,
+  loaded: false,
+  error: "",
+  decks: [],
+};
+
+// ───────── state helpers ─────────
 
 function createAggregateStats() {
-  return {
-    attempts: 0,
-    totalAccuracy: 0,
-    totalWpm: 0,
-    totalMs: 0,
-    cleanAttempts: 0,
-  };
+  return { attempts: 0, totalAccuracy: 0, totalWpm: 0, totalMs: 0, cleanAttempts: 0 };
+}
+
+function createSentenceModeStats() {
+  return { attempts: 0, totalAccuracy: 0, totalWpm: 0, lastSeenAt: 0, bestAccuracy: 0 };
 }
 
 function createSentenceStats() {
   const byMode = {};
   MODE_ORDER.forEach((mode) => {
-    byMode[mode] = {
-      attempts: 0,
-      totalAccuracy: 0,
-      totalWpm: 0,
-      lastSeenAt: 0,
-      bestAccuracy: 0,
-    };
+    byMode[mode] = createSentenceModeStats();
   });
-
-  return {
-    attempts: 0,
-    totalAccuracy: 0,
-    bestAccuracy: 0,
-    lastSeenAt: 0,
-    byMode,
-  };
+  return { attempts: 0, totalAccuracy: 0, bestAccuracy: 0, lastSeenAt: 0, byMode };
 }
 
 function createDefaultState(now = Date.now()) {
   const byMode = {};
-  const bySentence = {};
-
   MODE_ORDER.forEach((mode) => {
     byMode[mode] = createAggregateStats();
   });
 
-  SENTENCES.forEach((sentence) => {
-    bySentence[sentence.id] = createSentenceStats();
-  });
-
   return {
-    version: 1,
+    version: 2,
     createdAt: now,
     updatedAt: now,
     settings: {
       mode: "copy",
       hiddenWordCount: 1,
       previewSeconds: DEFAULT_PREVIEW_SECONDS,
+      replayLimit: DEFAULT_REPLAY_LIMIT,
+      sourceKind: "custom",
+      hvptDeckId: "",
+      hvptGroupId: "",
+      orderMode: "shuffle",
     },
     totals: createAggregateStats(),
     history: [],
     byMode,
-    bySentence,
+    bySentence: {},
+    customSentences: [],
   };
 }
 
@@ -300,6 +192,7 @@ function createSession() {
     cleanAttempts: 0,
     currentStreak: 0,
     bestStreak: 0,
+    sequentialIndex: 0,
   };
 }
 
@@ -311,94 +204,181 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
 }
 
+function coerceMode(value, fallback = "copy") {
+  if (typeof value !== "string") return fallback;
+  if (MODE_ORDER.includes(value)) return value;
+  if (value === "single" || value === "multi") return "flash";
+  return fallback;
+}
+
+function normalizeKey(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return raw.replace(/[^A-Za-z0-9._:\-]/g, "").slice(0, 160);
+}
+
 function copyAggregateStats(target, source) {
-  target.attempts = Math.max(0, numberOr(source?.attempts, target.attempts));
-  target.totalAccuracy = Math.max(0, numberOr(source?.totalAccuracy, target.totalAccuracy));
-  target.totalWpm = Math.max(0, numberOr(source?.totalWpm, target.totalWpm));
-  target.totalMs = Math.max(0, numberOr(source?.totalMs, target.totalMs));
-  target.cleanAttempts = Math.max(0, numberOr(source?.cleanAttempts, target.cleanAttempts));
+  if (!source || typeof source !== "object") return;
+  target.attempts = Math.max(0, numberOr(source.attempts, target.attempts));
+  target.totalAccuracy = Math.max(0, numberOr(source.totalAccuracy, target.totalAccuracy));
+  target.totalWpm = Math.max(0, numberOr(source.totalWpm, target.totalWpm));
+  target.totalMs = Math.max(0, numberOr(source.totalMs, target.totalMs));
+  target.cleanAttempts = Math.max(0, numberOr(source.cleanAttempts, target.cleanAttempts));
+}
+
+function foldAggregateStats(target, source) {
+  if (!source || typeof source !== "object") return;
+  target.attempts += Math.max(0, numberOr(source.attempts, 0));
+  target.totalAccuracy += Math.max(0, numberOr(source.totalAccuracy, 0));
+  target.totalWpm += Math.max(0, numberOr(source.totalWpm, 0));
+  target.totalMs += Math.max(0, numberOr(source.totalMs, 0));
+  target.cleanAttempts += Math.max(0, numberOr(source.cleanAttempts, 0));
 }
 
 function sanitizeHistory(items, fallbackNow = Date.now()) {
-  if (!Array.isArray(items)) {
-    return [];
-  }
+  if (!Array.isArray(items)) return [];
+  const cleaned = [];
+  items.forEach((item) => {
+    if (!item || typeof item !== "object") return;
+    const key = normalizeKey(item.sentenceKey || item.sentenceId);
+    if (!key) return;
+    cleaned.push({
+      sentenceKey: key,
+      mode: coerceMode(item.mode, "copy"),
+      accuracy: clamp(numberOr(item.accuracy, 0), 0, 100),
+      wpm: Math.max(0, numberOr(item.wpm, 0)),
+      timeMs: Math.max(0, numberOr(item.timeMs, 0)),
+      errors: Math.max(0, numberOr(item.errors, 0)),
+      clean: Boolean(item.clean),
+      at: Math.max(0, numberOr(item.at, fallbackNow)),
+    });
+  });
+  return cleaned.slice(-HISTORY_LIMIT);
+}
 
-  return items
-    .map((item) => ({
-      sentenceId: SENTENCE_IDS.has(item?.sentenceId) ? item.sentenceId : null,
-      mode: MODE_META[item?.mode] ? item.mode : "copy",
-      accuracy: clamp(numberOr(item?.accuracy, 0), 0, 100),
-      wpm: Math.max(0, numberOr(item?.wpm, 0)),
-      timeMs: Math.max(0, numberOr(item?.timeMs, 0)),
-      errors: Math.max(0, numberOr(item?.errors, 0)),
-      clean: Boolean(item?.clean),
-      at: Math.max(0, numberOr(item?.at, fallbackNow)),
-    }))
-    .filter((item) => item.sentenceId)
-    .slice(-HISTORY_LIMIT);
+function sanitizeSentenceStats(source) {
+  const target = createSentenceStats();
+  if (!source || typeof source !== "object") return target;
+  target.attempts = Math.max(0, numberOr(source.attempts, 0));
+  target.totalAccuracy = Math.max(0, numberOr(source.totalAccuracy, 0));
+  target.bestAccuracy = clamp(numberOr(source.bestAccuracy, 0), 0, 100);
+  target.lastSeenAt = Math.max(0, numberOr(source.lastSeenAt, 0));
+  const byMode = source.byMode || {};
+  MODE_ORDER.forEach((mode) => {
+    const modeSource = byMode[mode];
+    const modeTarget = target.byMode[mode];
+    if (modeSource && typeof modeSource === "object") {
+      modeTarget.attempts = Math.max(0, numberOr(modeSource.attempts, 0));
+      modeTarget.totalAccuracy = Math.max(0, numberOr(modeSource.totalAccuracy, 0));
+      modeTarget.totalWpm = Math.max(0, numberOr(modeSource.totalWpm, 0));
+      modeTarget.lastSeenAt = Math.max(0, numberOr(modeSource.lastSeenAt, 0));
+      modeTarget.bestAccuracy = clamp(numberOr(modeSource.bestAccuracy, 0), 0, 100);
+    }
+  });
+  // Fold legacy single/multi into flash.
+  ["single", "multi"].forEach((legacy) => {
+    const legacySource = byMode[legacy];
+    if (!legacySource || typeof legacySource !== "object") return;
+    const flash = target.byMode.flash;
+    flash.attempts += Math.max(0, numberOr(legacySource.attempts, 0));
+    flash.totalAccuracy += Math.max(0, numberOr(legacySource.totalAccuracy, 0));
+    flash.totalWpm += Math.max(0, numberOr(legacySource.totalWpm, 0));
+    flash.lastSeenAt = Math.max(flash.lastSeenAt, numberOr(legacySource.lastSeenAt, 0));
+    flash.bestAccuracy = Math.max(flash.bestAccuracy, clamp(numberOr(legacySource.bestAccuracy, 0), 0, 100));
+  });
+  return target;
+}
+
+function sanitizeBySentence(items) {
+  const result = {};
+  if (!items || typeof items !== "object") return result;
+  Object.entries(items).forEach(([rawKey, value]) => {
+    const key = normalizeKey(rawKey);
+    if (!key) return;
+    if (!value || typeof value !== "object") return;
+    result[key] = sanitizeSentenceStats(value);
+  });
+  return result;
+}
+
+function sanitizeCustomSentences(items, fallbackNow = Date.now()) {
+  if (!Array.isArray(items)) return [];
+  const seen = new Set();
+  const cleaned = [];
+  items.forEach((item) => {
+    if (!item || typeof item !== "object") return;
+    const id = normalizeKey(item.id);
+    if (!id || seen.has(id)) return;
+    const text = String(item.text || "").trim().slice(0, 500);
+    if (!text) return;
+    const english = String(item.english || "").trim().slice(0, 500);
+    const createdAt = Math.max(0, numberOr(item.createdAt, fallbackNow));
+    const updatedAt = Math.max(createdAt, numberOr(item.updatedAt, fallbackNow));
+    cleaned.push({ id, text, english, createdAt, updatedAt });
+    seen.add(id);
+  });
+  return cleaned.slice(0, MAX_CUSTOM_SENTENCES);
 }
 
 function sanitizeState(parsed, fallbackNow = Date.now()) {
   const base = createDefaultState(fallbackNow);
-  if (!parsed || typeof parsed !== "object") {
-    return base;
-  }
+  if (!parsed || typeof parsed !== "object") return base;
 
   base.createdAt = Math.max(0, numberOr(parsed.createdAt, base.createdAt));
   base.updatedAt = Math.max(0, numberOr(parsed.updatedAt, base.updatedAt));
-  const persistedMode = parsed.settings?.mode;
-  if (persistedMode === "copy" || persistedMode === "flash") {
-    base.settings.mode = persistedMode;
-  } else if (persistedMode === "single" || persistedMode === "multi") {
-    base.settings.mode = "flash";
-  }
+
+  const settings = parsed.settings || {};
+  base.settings.mode = coerceMode(settings.mode, base.settings.mode);
+  const hiddenSource = Number.isFinite(settings.hiddenWordCount)
+    ? settings.hiddenWordCount
+    : settings.multiHiddenCount;
   base.settings.hiddenWordCount = clamp(
-    numberOr(parsed.settings?.hiddenWordCount, parsed.settings?.multiHiddenCount ?? 1),
+    numberOr(hiddenSource, base.settings.hiddenWordCount),
     1,
-    MAX_HIDDEN_WORDS
+    MAX_HIDDEN_WORDS,
   );
   base.settings.previewSeconds = clamp(
-    numberOr(parsed.settings?.previewSeconds, DEFAULT_PREVIEW_SECONDS),
+    numberOr(settings.previewSeconds, base.settings.previewSeconds),
     MIN_PREVIEW_SECONDS,
-    MAX_PREVIEW_SECONDS
+    MAX_PREVIEW_SECONDS,
   );
+  base.settings.replayLimit = clamp(
+    numberOr(settings.replayLimit, base.settings.replayLimit),
+    MIN_REPLAY_LIMIT,
+    MAX_REPLAY_LIMIT,
+  );
+  if (settings.sourceKind === "custom" || settings.sourceKind === "hvpt") {
+    base.settings.sourceKind = settings.sourceKind;
+  }
+  const deckId = normalizeKey(settings.hvptDeckId);
+  base.settings.hvptDeckId = deckId || "";
+  const groupId = normalizeKey(settings.hvptGroupId);
+  base.settings.hvptGroupId = groupId || "";
+  if (settings.orderMode === "shuffle" || settings.orderMode === "sequential") {
+    base.settings.orderMode = settings.orderMode;
+  }
 
   copyAggregateStats(base.totals, parsed.totals);
   base.history = sanitizeHistory(parsed.history, fallbackNow);
 
+  const parsedByMode = parsed.byMode || {};
   MODE_ORDER.forEach((mode) => {
-    copyAggregateStats(base.byMode[mode], parsed.byMode?.[mode]);
+    copyAggregateStats(base.byMode[mode], parsedByMode[mode]);
+  });
+  // Fold legacy single/multi lane totals into flash.
+  ["single", "multi"].forEach((legacy) => {
+    foldAggregateStats(base.byMode.flash, parsedByMode[legacy]);
   });
 
-  SENTENCES.forEach((sentence) => {
-    const target = base.bySentence[sentence.id];
-    const source = parsed.bySentence?.[sentence.id];
-    target.attempts = Math.max(0, numberOr(source?.attempts, target.attempts));
-    target.totalAccuracy = Math.max(0, numberOr(source?.totalAccuracy, target.totalAccuracy));
-    target.bestAccuracy = clamp(numberOr(source?.bestAccuracy, target.bestAccuracy), 0, 100);
-    target.lastSeenAt = Math.max(0, numberOr(source?.lastSeenAt, target.lastSeenAt));
-
-    MODE_ORDER.forEach((mode) => {
-      const modeTarget = target.byMode[mode];
-      const modeSource = source?.byMode?.[mode];
-      modeTarget.attempts = Math.max(0, numberOr(modeSource?.attempts, modeTarget.attempts));
-      modeTarget.totalAccuracy = Math.max(0, numberOr(modeSource?.totalAccuracy, modeTarget.totalAccuracy));
-      modeTarget.totalWpm = Math.max(0, numberOr(modeSource?.totalWpm, modeTarget.totalWpm));
-      modeTarget.lastSeenAt = Math.max(0, numberOr(modeSource?.lastSeenAt, modeTarget.lastSeenAt));
-      modeTarget.bestAccuracy = clamp(numberOr(modeSource?.bestAccuracy, modeTarget.bestAccuracy), 0, 100);
-    });
-  });
-
+  base.bySentence = sanitizeBySentence(parsed.bySentence);
+  base.customSentences = sanitizeCustomSentences(parsed.customSentences, fallbackNow);
   return base;
 }
 
 function loadState() {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return createDefaultState(0);
-    }
+    const raw = window.localStorage.getItem(STORAGE_KEY) || window.localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!raw) return createDefaultState(0);
     return sanitizeState(JSON.parse(raw), 0);
   } catch (error) {
     return createDefaultState(0);
@@ -409,15 +389,12 @@ function persistLocalState() {
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (error) {
-    return;
+    // ignore
   }
 }
 
 function cloneStateSnapshot(source) {
-  if (typeof structuredClone === "function") {
-    return structuredClone(source);
-  }
-
+  if (typeof structuredClone === "function") return structuredClone(source);
   return JSON.parse(JSON.stringify(source));
 }
 
@@ -433,19 +410,12 @@ async function requestRemoteState(method = "GET", payload = null) {
     },
     ...(payload ? { body: JSON.stringify(payload) } : {}),
   });
-
-  if (!response.ok) {
-    throw new Error(`Remote sync failed with status ${response.status}`);
-  }
-
+  if (!response.ok) throw new Error(`Remote sync failed with status ${response.status}`);
   return response.json();
 }
 
 function queueRemoteSave(snapshot = cloneStateSnapshot(state)) {
-  if (typeof window.fetch !== "function") {
-    return;
-  }
-
+  if (typeof window.fetch !== "function") return;
   remoteSaveChain = remoteSaveChain
     .catch(() => undefined)
     .then(async () => {
@@ -460,10 +430,7 @@ function queueRemoteSave(snapshot = cloneStateSnapshot(state)) {
 }
 
 async function syncStateFromServer() {
-  if (typeof window.fetch !== "function") {
-    return;
-  }
-
+  if (typeof window.fetch !== "function") return;
   try {
     const remote = sanitizeState(await requestRemoteState());
     if (remote.updatedAt > state.updatedAt) {
@@ -474,12 +441,9 @@ async function syncStateFromServer() {
       }
       return;
     }
-
-    if (state.updatedAt > remote.updatedAt) {
-      queueRemoteSave();
-    }
+    if (state.updatedAt > remote.updatedAt) queueRemoteSave();
   } catch (error) {
-    return;
+    // ignore
   }
 }
 
@@ -489,86 +453,318 @@ function saveState() {
     persistLocalState();
     queueRemoteSave();
   } catch (error) {
+    // ignore
+  }
+}
+
+// ───────── HVPT source ─────────
+
+async function loadHvpt() {
+  if (hvpt.loading) return;
+  hvpt.loading = true;
+  renderHvptPicker();
+  try {
+    const response = await window.fetch(`${HVPT_API_BASE}/bootstrap`, {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    });
+    if (!response.ok) throw new Error(`HVPT bootstrap failed (${response.status})`);
+    const payload = await response.json();
+    hvpt.decks = Array.isArray(payload.decks) ? payload.decks : [];
+    hvpt.loaded = true;
+    hvpt.error = "";
+  } catch (error) {
+    hvpt.error = error.message || "Could not load HVPT decks.";
+    hvpt.loaded = false;
+  } finally {
+    hvpt.loading = false;
+    renderHvptPicker();
+    render();
+  }
+}
+
+function getHvptDeck(id = state.settings.hvptDeckId) {
+  if (!hvpt.loaded) return null;
+  if (id) {
+    const match = hvpt.decks.find((deck) => deck.id === id);
+    if (match) return match;
+  }
+  return hvpt.decks[0] || null;
+}
+
+function getHvptGroup(deck, id = state.settings.hvptGroupId) {
+  if (!deck || !id) return null;
+  return (deck.groups || []).find((group) => group.id === id) || null;
+}
+
+function getHvptPhrases() {
+  const deck = getHvptDeck();
+  if (!deck) return [];
+  const phrases = Array.isArray(deck.phrases) ? deck.phrases : [];
+  const group = getHvptGroup(deck);
+  if (!group) return phrases;
+  const byId = new Map(phrases.map((phrase) => [phrase.id, phrase]));
+  return (group.phraseIds || []).map((id) => byId.get(id)).filter(Boolean);
+}
+
+function hvptPhraseToSentence(phrase) {
+  return {
+    key: `hvpt:${phrase.id}`,
+    id: phrase.id,
+    text: String(phrase.text || "").trim(),
+    english: String(phrase.note || "").trim(),
+    source: "hvpt",
+    audioUrl: phrase.recordingUrl || "",
+    phrase,
+  };
+}
+
+function customSentenceToSentence(custom) {
+  return {
+    key: `custom:${custom.id}`,
+    id: custom.id,
+    text: custom.text,
+    english: custom.english || "",
+    source: "custom",
+    audioUrl: "",
+    custom,
+  };
+}
+
+function getActiveSentences() {
+  if (state.settings.sourceKind === "hvpt") {
+    return getHvptPhrases().filter((phrase) => String(phrase.text || "").trim()).map(hvptPhraseToSentence);
+  }
+  return state.customSentences.map(customSentenceToSentence);
+}
+
+function getSentenceByKey(key) {
+  if (!key) return null;
+  return getActiveSentences().find((sentence) => sentence.key === key) || null;
+}
+
+// ───────── text + scoring helpers ─────────
+
+function blurActiveElement() {
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+}
+
+function normalizeText(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function levenshtein(a, b) {
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const grid = Array.from({ length: rows }, () => Array(cols).fill(0));
+  for (let row = 0; row < rows; row += 1) grid[row][0] = row;
+  for (let col = 0; col < cols; col += 1) grid[0][col] = col;
+  for (let row = 1; row < rows; row += 1) {
+    for (let col = 1; col < cols; col += 1) {
+      const cost = a[row - 1] === b[col - 1] ? 0 : 1;
+      grid[row][col] = Math.min(
+        grid[row - 1][col] + 1,
+        grid[row][col - 1] + 1,
+        grid[row - 1][col - 1] + cost,
+      );
+    }
+  }
+  return grid[a.length][b.length];
+}
+
+function buildEditGrid(expectedChars, actualChars) {
+  const rows = expectedChars.length + 1;
+  const cols = actualChars.length + 1;
+  const grid = Array.from({ length: rows }, () => Array(cols).fill(0));
+  for (let row = 0; row < rows; row += 1) grid[row][0] = row;
+  for (let col = 0; col < cols; col += 1) grid[0][col] = col;
+  for (let row = 1; row < rows; row += 1) {
+    for (let col = 1; col < cols; col += 1) {
+      const cost = expectedChars[row - 1] === actualChars[col - 1] ? 0 : 1;
+      grid[row][col] = Math.min(
+        grid[row - 1][col] + 1,
+        grid[row][col - 1] + 1,
+        grid[row - 1][col - 1] + cost,
+      );
+    }
+  }
+  return grid;
+}
+
+function buildCharacterDiff(expectedText, actualText) {
+  const expectedChars = Array.from(expectedText || "");
+  const actualChars = Array.from(actualText || "");
+  const grid = buildEditGrid(expectedChars, actualChars);
+  const operations = [];
+  let row = expectedChars.length;
+  let col = actualChars.length;
+  while (row > 0 || col > 0) {
+    if (
+      row > 0 &&
+      col > 0 &&
+      grid[row][col] ===
+        grid[row - 1][col - 1] + (expectedChars[row - 1] === actualChars[col - 1] ? 0 : 1)
+    ) {
+      operations.push({
+        type: expectedChars[row - 1] === actualChars[col - 1] ? "match" : "replace",
+        expected: expectedChars[row - 1],
+        actual: actualChars[col - 1],
+      });
+      row -= 1;
+      col -= 1;
+      continue;
+    }
+    if (row > 0 && grid[row][col] === grid[row - 1][col] + 1) {
+      operations.push({ type: "delete", expected: expectedChars[row - 1], actual: "" });
+      row -= 1;
+      continue;
+    }
+    operations.push({ type: "insert", expected: "", actual: actualChars[col - 1] });
+    col -= 1;
+  }
+  return operations.reverse();
+}
+
+function renderDiffChar(character, className) {
+  const value = character ? escapeHtml(character).replaceAll(" ", "&nbsp;") : "·";
+  return `<span class="diff-char ${className}">${value}</span>`;
+}
+
+function buildDiffHtml(expectedText, actualText) {
+  const operations = buildCharacterDiff(expectedText, actualText);
+  const expectedLine = operations
+    .map((op) => {
+      if (op.type === "match") return renderDiffChar(op.expected, "is-match");
+      if (op.type === "replace") return renderDiffChar(op.expected, "is-miss");
+      if (op.type === "delete") return renderDiffChar(op.expected, "is-gap");
+      return renderDiffChar("", "is-gap");
+    })
+    .join("");
+  const actualLine = operations
+    .map((op) => {
+      if (op.type === "match") return renderDiffChar(op.actual, "is-match");
+      if (op.type === "replace") return renderDiffChar(op.actual, "is-miss");
+      if (op.type === "insert") return renderDiffChar(op.actual, "is-miss");
+      return renderDiffChar("", "is-gap");
+    })
+    .join("");
+  return `
+    <div class="diff-row">
+      <div class="diff-label">Correct</div>
+      <p class="diff-line">${expectedLine}</p>
+    </div>
+    <div class="diff-row">
+      <div class="diff-label">Typed</div>
+      <p class="diff-line">${actualLine}</p>
+    </div>
+  `;
+}
+
+function tokenizeSentence(text) {
+  const values = text.match(/[\p{L}\p{M}\p{N}-]+|[^\s\p{L}\p{M}\p{N}-]+/gu) || [];
+  return values.map((value) => ({ value, isWord: /[\p{L}\p{M}\p{N}]/u.test(value) }));
+}
+
+function needsSpaceBefore(token) {
+  return !NO_SPACE_BEFORE.has(token);
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function renderSentenceHtml(tokens, hiddenIndexes = [], { reveal = false, highlightHidden = false } = {}) {
+  const hiddenSet = new Set(hiddenIndexes);
+  let html = "";
+  tokens.forEach((token, index) => {
+    if (index > 0 && needsSpaceBefore(token.value)) html += " ";
+    if (token.isWord && hiddenSet.has(index) && !reveal) {
+      html += `<span class="masked-word" style="--letters:${Math.max(token.value.length, 2)}"></span>`;
+      return;
+    }
+    const classes = [];
+    if (token.isWord && hiddenSet.has(index) && highlightHidden) classes.push("token-highlight");
+    const classAttribute = classes.length ? ` class="${classes.join(" ")}"` : "";
+    html += `<span${classAttribute}>${escapeHtml(token.value)}</span>`;
+  });
+  return html;
+}
+
+function pickRandomItems(items, count) {
+  const copy = [...items];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+  return copy.slice(0, count);
+}
+
+function pickHiddenIndexes(tokens, requestedCount) {
+  const wordIndexes = tokens
+    .map((token, index) => ({ token, index }))
+    .filter(({ token }) => token.isWord);
+  if (!wordIndexes.length) return [];
+  const safeCount = clamp(requestedCount, 1, Math.max(1, wordIndexes.length - 1));
+  const primary = wordIndexes.filter(({ token }) => {
+    const normalized = normalizeText(token.value);
+    return token.value.length > 3 && !STOPWORDS.has(normalized);
+  });
+  const secondary = wordIndexes.filter(({ token }) => token.value.length > 2);
+  const tertiary = wordIndexes;
+  const chosen = [];
+  [primary, secondary, tertiary].forEach((pool) => {
+    const unused = pool.filter(({ index }) => !chosen.some((item) => item.index === index));
+    pickRandomItems(unused, safeCount - chosen.length).forEach((item) => {
+      if (chosen.length < safeCount) chosen.push(item);
+    });
+  });
+  return chosen.slice(0, safeCount).map(({ index }) => index).sort((a, b) => a - b);
+}
+
+function getCurrentElapsedMs() {
+  if (!currentAttempt) return 0;
+  if (currentAttempt.phase === "typing") {
+    return currentAttempt.elapsedMs + (Date.now() - currentAttempt.timerStartedAt);
+  }
+  return currentAttempt.elapsedMs;
+}
+
+function stopLiveInterval() {
+  if (liveInterval) {
+    window.clearInterval(liveInterval);
+    liveInterval = 0;
+  }
+}
+
+function ensureLiveInterval() {
+  if (!liveInterval) liveInterval = window.setInterval(tickAttempt, 100);
+}
+
+function tickAttempt() {
+  if (!currentAttempt) {
+    stopLiveInterval();
     return;
   }
-}
-
-function getMode() {
-  return state.settings.mode;
-}
-
-function getHiddenCountForMode(mode = getMode()) {
-  if (mode === "copy") {
-    return 0;
-  }
-  return clamp(state.settings.hiddenWordCount, 1, MAX_HIDDEN_WORDS);
-}
-
-function getPreviewSeconds() {
-  return clamp(state.settings.previewSeconds, MIN_PREVIEW_SECONDS, MAX_PREVIEW_SECONDS);
-}
-
-function getPreviewMs(mode = getMode()) {
-  if (mode === "copy") {
-    return 0;
-  }
-  return getPreviewSeconds() * 1000;
-}
-
-function getPracticeLane(mode = getMode()) {
-  if (mode === "copy") {
-    return "copy";
-  }
-  return getHiddenCountForMode(mode) === 1 ? "single" : "multi";
-}
-
-function combineAggregateStats(statsList) {
-  return statsList.reduce(
-    (combined, stats) => {
-      combined.attempts += stats.attempts;
-      combined.totalAccuracy += stats.totalAccuracy;
-      combined.totalWpm += stats.totalWpm;
-      combined.totalMs += stats.totalMs;
-      combined.cleanAttempts += stats.cleanAttempts;
-      return combined;
-    },
-    createAggregateStats()
-  );
-}
-
-function combineSentenceModeStats(statsList) {
-  return statsList.reduce(
-    (combined, stats) => {
-      combined.attempts += stats.attempts;
-      combined.totalAccuracy += stats.totalAccuracy;
-      combined.totalWpm += stats.totalWpm;
-      combined.lastSeenAt = Math.max(combined.lastSeenAt, stats.lastSeenAt);
-      combined.bestAccuracy = Math.max(combined.bestAccuracy, stats.bestAccuracy);
-      return combined;
-    },
-    {
-      attempts: 0,
-      totalAccuracy: 0,
-      totalWpm: 0,
-      lastSeenAt: 0,
-      bestAccuracy: 0,
+  if (currentAttempt.phase === "preview") {
+    currentAttempt.remainingPreviewMs = Math.max(0, currentAttempt.previewEndsAt - Date.now());
+    if (currentAttempt.remainingPreviewMs === 0) {
+      beginTypingPhase();
+      return;
     }
-  );
-}
-
-function getModeStatsForView(mode = getMode()) {
-  if (mode === "copy") {
-    return state.byMode.copy;
   }
-  return combineAggregateStats([state.byMode.single, state.byMode.multi]);
-}
-
-function getSentenceStatsForView(sentenceId, mode = getMode()) {
-  const sentenceStats = state.bySentence[sentenceId];
-  if (mode === "copy") {
-    return sentenceStats.byMode.copy;
+  if (currentAttempt.phase !== "preview" && currentAttempt.phase !== "typing") {
+    stopLiveInterval();
   }
-  return combineSentenceModeStats([sentenceStats.byMode.single, sentenceStats.byMode.multi]);
+  renderPracticePanel();
 }
 
 function average(total, attempts) {
@@ -593,342 +789,14 @@ function formatSeconds(ms) {
 
 function formatStudyTime(ms) {
   const seconds = Math.round(ms / 1000);
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
-
+  if (seconds < 60) return `${seconds}s`;
   const minutes = Math.floor(seconds / 60);
   const remainder = seconds % 60;
-  if (!remainder) {
-    return `${minutes}m`;
-  }
-
-  return `${minutes}m ${remainder}s`;
+  return remainder ? `${minutes}m ${remainder}s` : `${minutes}m`;
 }
 
 function formatRepCount(attempts) {
   return `${attempts} rep${attempts === 1 ? "" : "s"}`;
-}
-
-function getMasteryPercent(stats) {
-  return clamp(Math.round(getAverageAccuracy(stats)), 0, 100);
-}
-
-function getSentenceSection(stats) {
-  if (!stats.attempts) {
-    return "new";
-  }
-
-  if (stats.attempts >= MASTERED_MIN_ATTEMPTS && getAverageAccuracy(stats) >= MASTERED_AVERAGE_ACCURACY) {
-    return "mastered";
-  }
-
-  return "progress";
-}
-
-function blurActiveElement() {
-  if (document.activeElement instanceof HTMLElement) {
-    document.activeElement.blur();
-  }
-}
-
-function normalizeText(text) {
-  return String(text || "")
-    .toLowerCase()
-    .replace(/ё/g, "е")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function countWords(text) {
-  return (text.match(/[\p{L}\p{M}\p{N}-]+/gu) || []).length;
-}
-
-function levenshtein(a, b) {
-  const rows = a.length + 1;
-  const cols = b.length + 1;
-  const grid = Array.from({ length: rows }, () => Array(cols).fill(0));
-
-  for (let row = 0; row < rows; row += 1) {
-    grid[row][0] = row;
-  }
-
-  for (let col = 0; col < cols; col += 1) {
-    grid[0][col] = col;
-  }
-
-  for (let row = 1; row < rows; row += 1) {
-    for (let col = 1; col < cols; col += 1) {
-      const cost = a[row - 1] === b[col - 1] ? 0 : 1;
-      grid[row][col] = Math.min(
-        grid[row - 1][col] + 1,
-        grid[row][col - 1] + 1,
-        grid[row - 1][col - 1] + cost
-      );
-    }
-  }
-
-  return grid[a.length][b.length];
-}
-
-function buildEditGrid(expectedChars, actualChars) {
-  const rows = expectedChars.length + 1;
-  const cols = actualChars.length + 1;
-  const grid = Array.from({ length: rows }, () => Array(cols).fill(0));
-
-  for (let row = 0; row < rows; row += 1) {
-    grid[row][0] = row;
-  }
-
-  for (let col = 0; col < cols; col += 1) {
-    grid[0][col] = col;
-  }
-
-  for (let row = 1; row < rows; row += 1) {
-    for (let col = 1; col < cols; col += 1) {
-      const cost = expectedChars[row - 1] === actualChars[col - 1] ? 0 : 1;
-      grid[row][col] = Math.min(
-        grid[row - 1][col] + 1,
-        grid[row][col - 1] + 1,
-        grid[row - 1][col - 1] + cost
-      );
-    }
-  }
-
-  return grid;
-}
-
-function buildCharacterDiff(expectedText, actualText) {
-  const expectedChars = Array.from(expectedText || "");
-  const actualChars = Array.from(actualText || "");
-  const grid = buildEditGrid(expectedChars, actualChars);
-  const operations = [];
-  let row = expectedChars.length;
-  let col = actualChars.length;
-
-  while (row > 0 || col > 0) {
-    if (
-      row > 0 &&
-      col > 0 &&
-      grid[row][col] ===
-        grid[row - 1][col - 1] + (expectedChars[row - 1] === actualChars[col - 1] ? 0 : 1)
-    ) {
-      operations.push({
-        type: expectedChars[row - 1] === actualChars[col - 1] ? "match" : "replace",
-        expected: expectedChars[row - 1],
-        actual: actualChars[col - 1],
-      });
-      row -= 1;
-      col -= 1;
-      continue;
-    }
-
-    if (row > 0 && grid[row][col] === grid[row - 1][col] + 1) {
-      operations.push({
-        type: "delete",
-        expected: expectedChars[row - 1],
-        actual: "",
-      });
-      row -= 1;
-      continue;
-    }
-
-    operations.push({
-      type: "insert",
-      expected: "",
-      actual: actualChars[col - 1],
-    });
-    col -= 1;
-  }
-
-  return operations.reverse();
-}
-
-function renderDiffChar(character, className) {
-  const value = character ? escapeHtml(character).replaceAll(" ", "&nbsp;") : "·";
-  return `<span class="diff-char ${className}">${value}</span>`;
-}
-
-function buildDiffHtml(expectedText, actualText) {
-  const operations = buildCharacterDiff(expectedText, actualText);
-
-  const expectedLine = operations
-    .map((operation) => {
-      if (operation.type === "match") {
-        return renderDiffChar(operation.expected, "is-match");
-      }
-      if (operation.type === "replace") {
-        return renderDiffChar(operation.expected, "is-miss");
-      }
-      if (operation.type === "delete") {
-        return renderDiffChar(operation.expected, "is-gap");
-      }
-      return renderDiffChar("", "is-gap");
-    })
-    .join("");
-
-  const actualLine = operations
-    .map((operation) => {
-      if (operation.type === "match") {
-        return renderDiffChar(operation.actual, "is-match");
-      }
-      if (operation.type === "replace") {
-        return renderDiffChar(operation.actual, "is-miss");
-      }
-      if (operation.type === "insert") {
-        return renderDiffChar(operation.actual, "is-miss");
-      }
-      return renderDiffChar("", "is-gap");
-    })
-    .join("");
-
-  return `
-    <div class="diff-row">
-      <div class="diff-label">Correct</div>
-      <p class="diff-line">${expectedLine}</p>
-    </div>
-    <div class="diff-row">
-      <div class="diff-label">Typed</div>
-      <p class="diff-line">${actualLine}</p>
-    </div>
-  `;
-}
-
-function tokenizeSentence(text) {
-  const values = text.match(/[\p{L}\p{M}\p{N}-]+|[^\s\p{L}\p{M}\p{N}-]+/gu) || [];
-  return values.map((value) => ({
-    value,
-    isWord: /[\p{L}\p{M}\p{N}]/u.test(value),
-  }));
-}
-
-function needsSpaceBefore(token) {
-  return !NO_SPACE_BEFORE.has(token);
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function renderSentenceHtml(tokens, hiddenIndexes = [], { reveal = false, highlightHidden = false } = {}) {
-  const hiddenSet = new Set(hiddenIndexes);
-  let html = "";
-
-  tokens.forEach((token, index) => {
-    if (index > 0 && needsSpaceBefore(token.value)) {
-      html += " ";
-    }
-
-    if (token.isWord && hiddenSet.has(index) && !reveal) {
-      html += `<span class="masked-word" style="--letters:${Math.max(token.value.length, 2)}"></span>`;
-      return;
-    }
-
-    const classes = [];
-    if (token.isWord && hiddenSet.has(index) && highlightHidden) {
-      classes.push("token-highlight");
-    }
-
-    const classAttribute = classes.length ? ` class="${classes.join(" ")}"` : "";
-    html += `<span${classAttribute}>${escapeHtml(token.value)}</span>`;
-  });
-
-  return html;
-}
-
-function pickRandomItems(items, count) {
-  const copy = [...items];
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
-  }
-  return copy.slice(0, count);
-}
-
-function pickHiddenIndexes(tokens, requestedCount) {
-  const wordIndexes = tokens
-    .map((token, index) => ({ token, index }))
-    .filter(({ token }) => token.isWord);
-
-  if (!wordIndexes.length) {
-    return [];
-  }
-
-  const safeCount = clamp(requestedCount, 1, Math.max(1, wordIndexes.length - 1));
-  const primary = wordIndexes.filter(({ token }) => {
-    const normalized = normalizeText(token.value);
-    return token.value.length > 3 && !STOPWORDS.has(normalized);
-  });
-  const secondary = wordIndexes.filter(({ token }) => token.value.length > 2);
-  const tertiary = wordIndexes;
-
-  const chosen = [];
-  const poolOrder = [primary, secondary, tertiary];
-
-  poolOrder.forEach((pool) => {
-    const unused = pool.filter(({ index }) => !chosen.some((item) => item.index === index));
-    pickRandomItems(unused, safeCount - chosen.length).forEach((item) => {
-      if (chosen.length < safeCount) {
-        chosen.push(item);
-      }
-    });
-  });
-
-  return chosen
-    .slice(0, safeCount)
-    .map(({ index }) => index)
-    .sort((left, right) => left - right);
-}
-
-function getCurrentElapsedMs() {
-  if (!currentAttempt) {
-    return 0;
-  }
-
-  if (currentAttempt.phase === "typing") {
-    return currentAttempt.elapsedMs + (Date.now() - currentAttempt.timerStartedAt);
-  }
-
-  return currentAttempt.elapsedMs;
-}
-
-function stopLiveInterval() {
-  if (liveInterval) {
-    window.clearInterval(liveInterval);
-    liveInterval = 0;
-  }
-}
-
-function ensureLiveInterval() {
-  if (!liveInterval) {
-    liveInterval = window.setInterval(tickAttempt, 100);
-  }
-}
-
-function tickAttempt() {
-  if (!currentAttempt) {
-    stopLiveInterval();
-    return;
-  }
-
-  if (currentAttempt.phase === "preview") {
-    currentAttempt.remainingPreviewMs = Math.max(0, currentAttempt.previewEndsAt - Date.now());
-    if (currentAttempt.remainingPreviewMs === 0) {
-      beginTypingPhase();
-      return;
-    }
-  }
-
-  if (currentAttempt.phase !== "preview" && currentAttempt.phase !== "typing") {
-    stopLiveInterval();
-  }
-
-  renderPracticePanel();
 }
 
 function getAverageAccuracy(stats) {
@@ -939,129 +807,233 @@ function getAverageWpm(stats) {
   return average(stats.totalWpm, stats.attempts);
 }
 
+function getMasteryPercent(stats) {
+  return clamp(Math.round(getAverageAccuracy(stats)), 0, 100);
+}
+
+function getSentenceSection(stats) {
+  if (!stats.attempts) return "new";
+  if (stats.attempts >= MASTERED_MIN_ATTEMPTS && getAverageAccuracy(stats) >= MASTERED_AVERAGE_ACCURACY) {
+    return "mastered";
+  }
+  return "progress";
+}
+
+function getSentenceStatsEntry(key) {
+  if (!key) return createSentenceStats();
+  return state.bySentence[key] || createSentenceStats();
+}
+
+function getSentenceStatsForView(key, mode = getMode()) {
+  const stats = getSentenceStatsEntry(key);
+  return stats.byMode[mode] || createSentenceModeStats();
+}
+
 function computeTrend() {
   const history = state.history;
   if (history.length < RECENT_WINDOW) {
-    return {
-      label: "Waiting for attempts",
-      detail: `Need ${RECENT_WINDOW} scored reps.`,
-    };
+    return { label: "Waiting for attempts", detail: `Need ${RECENT_WINDOW} scored reps.` };
   }
-
   const recent = history.slice(-RECENT_WINDOW);
   const previous = history.slice(-(RECENT_WINDOW * 2), -RECENT_WINDOW);
   const recentAverage = average(
     recent.reduce((total, item) => total + item.accuracy, 0),
-    recent.length
+    recent.length,
   );
-
   if (!previous.length) {
     return {
       label: "First block complete",
       detail: `${formatPercent(recentAverage)} across the last ${recent.length} reps.`,
     };
   }
-
   const previousAverage = average(
     previous.reduce((total, item) => total + item.accuracy, 0),
-    previous.length
+    previous.length,
   );
   const delta = recentAverage - previousAverage;
-
-  if (delta >= 2.5) {
-    return {
-      label: "Sharpening",
-      detail: `Accuracy up ${delta.toFixed(1)} points.`,
-    };
-  }
-
-  if (delta <= -2.5) {
-    return {
-      label: "Slipping",
-      detail: `Accuracy down ${Math.abs(delta).toFixed(1)} points.`,
-    };
-  }
-
-  return {
-    label: "Stable",
-    detail: `Within ${Math.abs(delta).toFixed(1)} points of the last block.`,
-  };
+  if (delta >= 2.5) return { label: "Sharpening", detail: `Accuracy up ${delta.toFixed(1)} points.` };
+  if (delta <= -2.5) return { label: "Slipping", detail: `Accuracy down ${Math.abs(delta).toFixed(1)} points.` };
+  return { label: "Stable", detail: `Within ${Math.abs(delta).toFixed(1)} points of the last block.` };
 }
 
 function getSessionBadge() {
-  if (session.attempts < 3) {
-    return "Fresh run";
-  }
-
+  if (session.attempts < 3) return "Fresh run";
   const avgAccuracy = average(session.totalAccuracy, session.attempts);
   const avgWpm = average(session.totalWpm, session.attempts);
-
-  if (avgAccuracy >= 97 && avgWpm >= 16) {
-    return "Locked in";
-  }
-
-  if (avgAccuracy >= 93) {
-    return "Clean run";
-  }
-
-  if (avgAccuracy >= 88) {
-    return "Settling in";
-  }
-
+  if (avgAccuracy >= 97 && avgWpm >= 16) return "Locked in";
+  if (avgAccuracy >= 93) return "Clean run";
+  if (avgAccuracy >= 88) return "Settling in";
   return "Dig in";
 }
 
-function pickSentence(lane) {
-  const ranked = SENTENCES.map((sentence) => {
-    const stats = state.bySentence[sentence.id].byMode[lane];
+// ───────── picker ─────────
+
+function pickSentence() {
+  const pool = getActiveSentences();
+  if (!pool.length) return null;
+
+  if (queuedSentenceKey) {
+    const match = pool.find((s) => s.key === queuedSentenceKey);
+    queuedSentenceKey = "";
+    if (match) return match;
+  }
+
+  if (state.settings.orderMode === "sequential") {
+    const index = session.sequentialIndex % pool.length;
+    session.sequentialIndex = (session.sequentialIndex + 1) % pool.length;
+    return pool[index];
+  }
+
+  const mode = getMode();
+  const lastKey = currentAttempt?.sentence?.key || "";
+  const ranked = pool.map((sentence) => {
+    const stats = getSentenceStatsForView(sentence.key, mode);
     const avgAccuracy = getAverageAccuracy(stats);
     const avgWpm = getAverageWpm(stats);
-    const freshnessPenalty = stats.lastSeenAt ? Math.min((Date.now() - stats.lastSeenAt) / 60000, 240) : 80;
-    const challenge =
+    const freshness = stats.lastSeenAt ? Math.min((Date.now() - stats.lastSeenAt) / 60000, 240) : 80;
+    let weight =
       (stats.attempts ? 0 : 18) +
       (100 - avgAccuracy) * 0.7 +
       Math.max(0, 18 - avgWpm) * 0.8 +
-      freshnessPenalty * 0.08;
-
-    return {
-      sentence,
-      weight: Math.max(6, challenge),
-    };
+      freshness * 0.08;
+    if (sentence.key === lastKey && pool.length > 1) weight *= 0.05;
+    return { sentence, weight: Math.max(2, weight) };
   });
-
   const totalWeight = ranked.reduce((total, item) => total + item.weight, 0);
   let cursor = Math.random() * totalWeight;
-
   for (const item of ranked) {
     cursor -= item.weight;
-    if (cursor <= 0) {
-      return item.sentence;
-    }
+    if (cursor <= 0) return item.sentence;
   }
-
   return ranked[0].sentence;
 }
 
-function createAttempt({ sentence = null, hiddenIndexes = null, mode = getMode(), lane = getPracticeLane(mode) } = {}) {
-  const sentenceChoice = sentence || pickSentence(lane);
-  const hiddenCount = getHiddenCountForMode(mode);
-  const previewMs = getPreviewMs(mode);
-  const tokens = tokenizeSentence(sentenceChoice.text);
+// ───────── audio ─────────
 
+function stopAudio() {
+  try {
+    elements.audioPlayer.pause();
+    elements.audioPlayer.currentTime = 0;
+  } catch {}
+  try {
+    window.speechSynthesis?.cancel();
+  } catch {}
+}
+
+function ensureSpeechVoice() {
+  if (speechVoice || !("speechSynthesis" in window)) return speechVoice;
+  const voices = window.speechSynthesis.getVoices();
+  speechVoicesLoaded = voices.length > 0;
+  const ruVoice = voices.find((voice) => /ru/i.test(voice.lang)) || null;
+  speechVoice = ruVoice;
+  return speechVoice;
+}
+
+function playSentenceAudio(sentence) {
+  if (!sentence) return false;
+  stopAudio();
+  if (sentence.audioUrl) {
+    try {
+      const url = new URL(sentence.audioUrl, window.location.href).toString();
+      elements.audioPlayer.src = url;
+      const playPromise = elements.audioPlayer.play();
+      if (playPromise && typeof playPromise.catch === "function") {
+        playPromise.catch(() => speakSentence(sentence));
+      }
+      return true;
+    } catch {
+      return speakSentence(sentence);
+    }
+  }
+  return speakSentence(sentence);
+}
+
+function speakSentence(sentence) {
+  if (!("speechSynthesis" in window)) return false;
+  const utterance = new SpeechSynthesisUtterance(sentence.text);
+  utterance.lang = "ru-RU";
+  ensureSpeechVoice();
+  if (speechVoice) utterance.voice = speechVoice;
+  utterance.rate = 0.9;
+  try {
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function triggerAttemptAudio() {
+  if (!currentAttempt || currentAttempt.mode !== "listen") return;
+  const limit = state.settings.replayLimit;
+  if (currentAttempt.playCount >= limit) return;
+  currentAttempt.playCount += 1;
+  currentAttempt.audioPlaying = true;
+  playSentenceAudio(currentAttempt.sentence);
+  if (currentAttempt.phase === "preview") beginTypingPhase();
+  renderPracticePanel();
+}
+
+// ───────── attempts ─────────
+
+function getMode() {
+  return state.settings.mode;
+}
+
+function getHiddenCountForMode(mode = getMode()) {
+  if (mode !== "flash") return 0;
+  return clamp(state.settings.hiddenWordCount, 1, MAX_HIDDEN_WORDS);
+}
+
+function getPreviewSeconds() {
+  return clamp(state.settings.previewSeconds, MIN_PREVIEW_SECONDS, MAX_PREVIEW_SECONDS);
+}
+
+function getReplayLimit() {
+  return clamp(state.settings.replayLimit, MIN_REPLAY_LIMIT, MAX_REPLAY_LIMIT);
+}
+
+function getPreviewMs(mode = getMode()) {
+  if (mode === "flash") return getPreviewSeconds() * 1000;
+  return 0;
+}
+
+function createAttempt({ sentence = null, hiddenIndexes = null, mode = getMode() } = {}) {
+  stopAudio();
+  const pool = getActiveSentences();
+  if (!pool.length) {
+    currentAttempt = null;
+    render();
+    return;
+  }
+  const sentenceChoice = sentence || pickSentence();
+  if (!sentenceChoice) {
+    currentAttempt = null;
+    render();
+    return;
+  }
+
+  const hiddenCount = getHiddenCountForMode(mode);
+  const tokens = tokenizeSentence(sentenceChoice.text);
+  const previewMs = getPreviewMs(mode);
+
+  const phase = mode === "copy" ? "typing" : "preview";
   currentAttempt = {
     sentence: sentenceChoice,
-    mode: lane,
-    uiMode: mode,
+    mode,
     tokens,
     hiddenCount,
     hiddenIndexes: hiddenCount ? hiddenIndexes || pickHiddenIndexes(tokens, hiddenCount) : [],
-    phase: mode === "copy" ? "typing" : "preview",
-    previewEndsAt: mode === "copy" ? 0 : Date.now() + previewMs,
-    remainingPreviewMs: mode === "copy" ? 0 : previewMs,
+    phase,
+    previewEndsAt: mode === "flash" ? Date.now() + previewMs : 0,
+    remainingPreviewMs: mode === "flash" ? previewMs : 0,
     elapsedMs: 0,
     timerStartedAt: mode === "copy" ? Date.now() : 0,
     errors: 0,
     result: null,
+    playCount: 0,
+    audioPlaying: false,
   };
 
   elements.sentenceInput.value = "";
@@ -1069,11 +1041,14 @@ function createAttempt({ sentence = null, hiddenIndexes = null, mode = getMode()
   elements.layoutHint.classList.add("hidden");
 
   if (mode === "copy") {
-    window.setTimeout(() => {
-      elements.sentenceInput.focus();
-    }, 0);
+    window.setTimeout(() => elements.sentenceInput.focus(), 0);
   } else {
     blurActiveElement();
+  }
+
+  if (mode === "listen") {
+    // Auto-play the first time on a fresh listen attempt, then user can replay.
+    window.setTimeout(() => triggerAttemptAudio(), 120);
   }
 
   ensureLiveInterval();
@@ -1081,17 +1056,12 @@ function createAttempt({ sentence = null, hiddenIndexes = null, mode = getMode()
 }
 
 function beginTypingPhase() {
-  if (!currentAttempt) {
-    return;
-  }
-
+  if (!currentAttempt) return;
   currentAttempt.phase = "typing";
   currentAttempt.timerStartedAt = Date.now();
   currentAttempt.remainingPreviewMs = 0;
   elements.sentenceInput.disabled = false;
-  window.setTimeout(() => {
-    elements.sentenceInput.focus();
-  }, 0);
+  window.setTimeout(() => elements.sentenceInput.focus(), 0);
   ensureLiveInterval();
   render();
 }
@@ -1101,7 +1071,6 @@ function startOrResume() {
     createAttempt();
     return;
   }
-
   if (currentAttempt.phase === "paused") {
     if (currentAttempt.pausedPhase === "preview") {
       currentAttempt.phase = "preview";
@@ -1110,31 +1079,21 @@ function startOrResume() {
       currentAttempt.phase = "typing";
       currentAttempt.timerStartedAt = Date.now();
       elements.sentenceInput.disabled = false;
-      window.setTimeout(() => {
-        elements.sentenceInput.focus();
-      }, 0);
+      window.setTimeout(() => elements.sentenceInput.focus(), 0);
     }
-
     ensureLiveInterval();
     render();
     return;
   }
-
   if (currentAttempt.phase === "review") {
     createAttempt();
     return;
   }
-
-  if (currentAttempt.phase === "typing") {
-    elements.sentenceInput.focus();
-  }
+  if (currentAttempt.phase === "typing") elements.sentenceInput.focus();
 }
 
 function pauseAttempt() {
-  if (!currentAttempt) {
-    return;
-  }
-
+  if (!currentAttempt) return;
   if (currentAttempt.phase === "typing") {
     currentAttempt.elapsedMs = getCurrentElapsedMs();
     currentAttempt.phase = "paused";
@@ -1147,7 +1106,7 @@ function pauseAttempt() {
   } else {
     return;
   }
-
+  stopAudio();
   stopLiveInterval();
   blurActiveElement();
   render();
@@ -1155,33 +1114,32 @@ function pauseAttempt() {
 
 function nextSentence() {
   stopLiveInterval();
+  stopAudio();
   createAttempt();
 }
 
 function replayCurrentSentence() {
-  if (!currentAttempt) {
-    return;
-  }
-
+  if (!currentAttempt) return;
   stopLiveInterval();
+  stopAudio();
   createAttempt({
     sentence: currentAttempt.sentence,
     hiddenIndexes: currentAttempt.hiddenIndexes,
-    mode: currentAttempt.uiMode,
-    lane: currentAttempt.mode,
+    mode: currentAttempt.mode,
   });
 }
 
 function resetProgress() {
   const confirmed = window.confirm("Reset all sentence progress on this device?");
-  if (!confirmed) {
-    return;
-  }
-
+  if (!confirmed) return;
   stopLiveInterval();
+  stopAudio();
+  const previous = state.customSentences;
   state = createDefaultState(Date.now());
+  state.customSentences = sanitizeCustomSentences(previous, Date.now());
   session = createSession();
   currentAttempt = null;
+  queuedSentenceKey = "";
   elements.resetMenu?.removeAttribute("open");
   saveState();
   render();
@@ -1191,6 +1149,7 @@ function clearInput() {
   elements.sentenceInput.value = "";
   elements.layoutHint.classList.add("hidden");
   renderPracticePanel();
+  renderButtons();
 }
 
 function restartCurrentSentence(mode = getMode()) {
@@ -1198,56 +1157,151 @@ function restartCurrentSentence(mode = getMode()) {
     render();
     return;
   }
-
   stopLiveInterval();
-  createAttempt({
-    sentence: currentAttempt.sentence,
-    mode,
-    lane: getPracticeLane(mode),
-  });
+  stopAudio();
+  createAttempt({ sentence: currentAttempt.sentence, mode });
 }
 
 function setMode(mode) {
-  if (!UI_MODE_META[mode] || mode === getMode()) {
-    return;
-  }
-
+  if (!MODE_META[mode] || mode === getMode()) return;
   state.settings.mode = mode;
   saveState();
   restartCurrentSentence(mode);
 }
 
+function setSource(kind) {
+  if (kind !== "custom" && kind !== "hvpt") return;
+  if (state.settings.sourceKind === kind) return;
+  state.settings.sourceKind = kind;
+  session.sequentialIndex = 0;
+  queuedSentenceKey = "";
+  saveState();
+  stopAudio();
+  stopLiveInterval();
+  currentAttempt = null;
+  if (kind === "hvpt" && !hvpt.loaded && !hvpt.loading) void loadHvpt();
+  render();
+}
+
+function setOrderMode(order) {
+  if (order !== "shuffle" && order !== "sequential") return;
+  if (state.settings.orderMode === order) return;
+  state.settings.orderMode = order;
+  session.sequentialIndex = 0;
+  saveState();
+  render();
+}
+
+function setHvptDeck(id) {
+  const safe = normalizeKey(id);
+  if (state.settings.hvptDeckId === safe) return;
+  state.settings.hvptDeckId = safe;
+  state.settings.hvptGroupId = "";
+  session.sequentialIndex = 0;
+  queuedSentenceKey = "";
+  stopAudio();
+  stopLiveInterval();
+  currentAttempt = null;
+  saveState();
+  render();
+}
+
+function setHvptGroup(id) {
+  const safe = normalizeKey(id);
+  if (state.settings.hvptGroupId === safe) return;
+  state.settings.hvptGroupId = safe;
+  session.sequentialIndex = 0;
+  queuedSentenceKey = "";
+  stopAudio();
+  stopLiveInterval();
+  currentAttempt = null;
+  saveState();
+  render();
+}
+
 function adjustHiddenCount(delta) {
   const nextValue = clamp(state.settings.hiddenWordCount + delta, 1, MAX_HIDDEN_WORDS);
-  if (nextValue === state.settings.hiddenWordCount) {
-    return;
-  }
-
+  if (nextValue === state.settings.hiddenWordCount) return;
   state.settings.hiddenWordCount = nextValue;
   saveState();
-
-  if (getMode() === "flash") {
-    restartCurrentSentence("flash");
-  } else {
-    render();
-  }
+  if (getMode() === "flash") restartCurrentSentence("flash");
+  else render();
 }
 
 function adjustPreviewSeconds(delta) {
   const nextValue = clamp(getPreviewSeconds() + delta, MIN_PREVIEW_SECONDS, MAX_PREVIEW_SECONDS);
-  if (nextValue === state.settings.previewSeconds) {
-    return;
-  }
-
+  if (nextValue === state.settings.previewSeconds) return;
   state.settings.previewSeconds = nextValue;
   saveState();
-
-  if (getMode() === "flash") {
-    restartCurrentSentence("flash");
-  } else {
-    render();
-  }
+  if (getMode() === "flash") restartCurrentSentence("flash");
+  else render();
 }
+
+function adjustReplayLimit(delta) {
+  const nextValue = clamp(getReplayLimit() + delta, MIN_REPLAY_LIMIT, MAX_REPLAY_LIMIT);
+  if (nextValue === state.settings.replayLimit) return;
+  state.settings.replayLimit = nextValue;
+  saveState();
+  render();
+}
+
+function makeId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID().replace(/-/g, "").slice(0, 24);
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+function addCustomSentence() {
+  const russian = elements.addRussian.value.trim();
+  const english = elements.addEnglish.value.trim();
+  if (!russian) {
+    elements.addRussian.focus();
+    elements.addHint.textContent = "Add the Russian text first.";
+    return;
+  }
+  if (state.customSentences.length >= MAX_CUSTOM_SENTENCES) {
+    elements.addHint.textContent = `Max ${MAX_CUSTOM_SENTENCES} custom sentences.`;
+    return;
+  }
+  const now = Date.now();
+  const id = makeId();
+  state.customSentences.unshift({
+    id,
+    text: russian.slice(0, 500),
+    english: english.slice(0, 500),
+    createdAt: now,
+    updatedAt: now,
+  });
+  elements.addRussian.value = "";
+  elements.addEnglish.value = "";
+  elements.addHint.textContent = "Saved. Press Enter to add another.";
+  saveState();
+  render();
+  elements.addRussian.focus();
+}
+
+function deleteCustomSentence(id) {
+  const target = state.customSentences.find((item) => item.id === id);
+  if (!target) return;
+  const confirmed = window.confirm(`Delete "${target.text}"?`);
+  if (!confirmed) return;
+  state.customSentences = state.customSentences.filter((item) => item.id !== id);
+  if (currentAttempt?.sentence?.key === `custom:${id}`) {
+    currentAttempt = null;
+    stopLiveInterval();
+    stopAudio();
+  }
+  saveState();
+  render();
+}
+
+function queueSentence(key) {
+  queuedSentenceKey = key;
+  stopLiveInterval();
+  stopAudio();
+  createAttempt();
+}
+
+// ───────── result + scoring ─────────
 
 function buildResultMetrics(result) {
   return `
@@ -1271,14 +1325,9 @@ function buildResultMetrics(result) {
 }
 
 function scoreAttempt() {
-  if (!currentAttempt || currentAttempt.phase !== "typing") {
-    return;
-  }
-
+  if (!currentAttempt || currentAttempt.phase !== "typing") return;
   const typedText = elements.sentenceInput.value.trim();
-  if (!typedText) {
-    return;
-  }
+  if (!typedText) return;
 
   currentAttempt.elapsedMs = getCurrentElapsedMs();
   const targetNormalized = normalizeText(currentAttempt.sentence.text);
@@ -1290,7 +1339,7 @@ function scoreAttempt() {
   const minutes = Math.max(currentAttempt.elapsedMs, 1) / 60000;
   const wpm = correctChars ? (correctChars / 5) / minutes : 0;
   const result = {
-    sentenceId: currentAttempt.sentence.id,
+    sentenceKey: currentAttempt.sentence.key,
     mode: currentAttempt.mode,
     accuracy,
     wpm,
@@ -1298,28 +1347,20 @@ function scoreAttempt() {
     errors: currentAttempt.errors,
     clean: accuracy >= CLEAN_THRESHOLD,
     at: Date.now(),
-    typedText: elements.sentenceInput.value.trim(),
+    typedText,
   };
 
   currentAttempt.phase = "review";
   currentAttempt.result = result;
   elements.sentenceInput.disabled = true;
   stopLiveInterval();
+  stopAudio();
   applyResult(result);
   saveState();
   render();
   window.setTimeout(() => {
-    try {
-      elements.advanceButton.scrollIntoView({ block: "nearest", inline: "nearest" });
-    } catch {
-      elements.advanceButton.scrollIntoView();
-    }
-
-    try {
-      elements.advanceButton.focus({ preventScroll: true });
-    } catch {
-      elements.advanceButton.focus();
-    }
+    try { elements.advanceButton.scrollIntoView({ block: "nearest" }); } catch { elements.advanceButton.scrollIntoView(); }
+    try { elements.advanceButton.focus({ preventScroll: true }); } catch { elements.advanceButton.focus(); }
   }, 60);
 }
 
@@ -1339,20 +1380,19 @@ function applyResult(result) {
   state.totals.totalAccuracy += result.accuracy;
   state.totals.totalWpm += result.wpm;
   state.totals.totalMs += result.timeMs;
-  if (result.clean) {
-    state.totals.cleanAttempts += 1;
-  }
+  if (result.clean) state.totals.cleanAttempts += 1;
 
   const modeStats = state.byMode[result.mode];
   modeStats.attempts += 1;
   modeStats.totalAccuracy += result.accuracy;
   modeStats.totalWpm += result.wpm;
   modeStats.totalMs += result.timeMs;
-  if (result.clean) {
-    modeStats.cleanAttempts += 1;
-  }
+  if (result.clean) modeStats.cleanAttempts += 1;
 
-  const sentenceStats = state.bySentence[result.sentenceId];
+  if (!state.bySentence[result.sentenceKey]) {
+    state.bySentence[result.sentenceKey] = createSentenceStats();
+  }
+  const sentenceStats = state.bySentence[result.sentenceKey];
   sentenceStats.attempts += 1;
   sentenceStats.totalAccuracy += result.accuracy;
   sentenceStats.bestAccuracy = Math.max(sentenceStats.bestAccuracy, result.accuracy);
@@ -1366,7 +1406,7 @@ function applyResult(result) {
   sentenceModeStats.bestAccuracy = Math.max(sentenceModeStats.bestAccuracy, result.accuracy);
 
   state.history.push({
-    sentenceId: result.sentenceId,
+    sentenceKey: result.sentenceKey,
     mode: result.mode,
     accuracy: result.accuracy,
     wpm: result.wpm,
@@ -1378,14 +1418,25 @@ function applyResult(result) {
   state.history = state.history.slice(-HISTORY_LIMIT);
 }
 
-function renderHero() {
-  const covered = SENTENCES.filter((sentence) => state.bySentence[sentence.id].attempts > 0).length;
-  const modeCovered = SENTENCES.filter((sentence) => getSentenceStatsForView(sentence.id).attempts > 0).length;
-  const trend = computeTrend();
-  const modeLabel = UI_MODE_META[getMode()].label;
+// ───────── rendering ─────────
 
-  elements.coverageCount.textContent = `${covered} / ${SENTENCES.length}`;
-  elements.coverageDetail.textContent = `${modeCovered} touched in ${modeLabel}.`;
+function renderHero() {
+  const pool = getActiveSentences();
+  const covered = pool.filter((sentence) => (state.bySentence[sentence.key]?.attempts || 0) > 0).length;
+  elements.coverageCount.textContent = `${pool.length} sentence${pool.length === 1 ? "" : "s"}`;
+
+  if (!pool.length) {
+    const sourceName = state.settings.sourceKind === "hvpt" ? "HVPT" : "your bank";
+    elements.coverageDetail.textContent =
+      state.settings.sourceKind === "hvpt"
+        ? "Pick an HVPT deck and group below."
+        : "Add a sentence below to begin.";
+    void sourceName;
+  } else {
+    elements.coverageDetail.textContent = `${covered} of ${pool.length} practiced in ${MODE_META[getMode()].label}.`;
+  }
+
+  const trend = computeTrend();
   elements.recentTrend.textContent = trend.label;
   elements.recentTrendDetail.textContent = trend.detail;
 }
@@ -1395,8 +1446,10 @@ function renderPracticePanel() {
   const mode = getMode();
   const flashWordCount = clamp(state.settings.hiddenWordCount, 1, MAX_HIDDEN_WORDS);
   const previewSeconds = getPreviewSeconds();
+  const replayLimit = getReplayLimit();
   const hasInput = Boolean(elements.sentenceInput.value.trim());
   const isReview = attempt?.phase === "review";
+  const pool = getActiveSentences();
 
   elements.modeButtons.forEach((button) => {
     const isActive = button.dataset.mode === mode;
@@ -1404,29 +1457,46 @@ function renderPracticePanel() {
     button.setAttribute("aria-pressed", String(isActive));
   });
 
-  elements.settingsRow.classList.toggle("hidden", mode === "copy");
+  const showSettings = mode !== "copy";
+  elements.settingsRow.classList.toggle("hidden", !showSettings);
+  elements.flashWordsSetting.classList.toggle("hidden", mode !== "flash");
+  elements.previewSetting.classList.toggle("hidden", mode !== "flash");
+  elements.replaySetting.classList.toggle("hidden", mode !== "listen");
+
   elements.missingCount.textContent = String(flashWordCount);
   elements.missingMinus.disabled = flashWordCount <= 1;
   elements.missingPlus.disabled = flashWordCount >= MAX_HIDDEN_WORDS;
   elements.previewSeconds.textContent = `${previewSeconds}s`;
   elements.previewMinus.disabled = previewSeconds <= MIN_PREVIEW_SECONDS;
   elements.previewPlus.disabled = previewSeconds >= MAX_PREVIEW_SECONDS;
+  elements.replayLimit.textContent = String(replayLimit);
+  elements.replayMinus.disabled = replayLimit <= MIN_REPLAY_LIMIT;
+  elements.replayPlus.disabled = replayLimit >= MAX_REPLAY_LIMIT;
+
+  const isListen = mode === "listen";
+  elements.audioStage.classList.toggle("hidden", !isListen || !attempt || isReview);
 
   if (!attempt) {
     elements.statusPill.className = "status-pill idle";
-    elements.statusPill.textContent = "Paused";
-    elements.countdownPill.textContent = "Ready";
+    elements.statusPill.textContent = pool.length ? "Ready" : "Empty";
+    elements.countdownPill.textContent = pool.length ? "Ready" : "Add sentences";
     elements.promptStage.className = "prompt-stage idle";
     elements.promptStage.classList.remove("hidden");
     elements.entryPanel.classList.remove("hidden");
-    elements.englishGloss.textContent = "Start to load the first sentence.";
-    elements.sentenceDisplay.textContent = "Press Start to begin.";
+    elements.englishGloss.textContent = pool.length
+      ? "Press Start for the first sentence."
+      : state.settings.sourceKind === "hvpt"
+        ? "No HVPT phrases in this view. Pick another deck or group."
+        : "Add a Russian sentence below to practice.";
+    elements.sentenceDisplay.textContent = pool.length ? "Press Start to begin." : "—";
     elements.hiddenWordsRow.classList.add("hidden");
     elements.hiddenWordsRow.innerHTML = "";
     elements.liveTimer.textContent = "0.0s";
     elements.attemptErrors.textContent = "0";
     elements.currentStreak.textContent = String(session.currentStreak);
-    elements.feedbackMessage.textContent = UI_MODE_META[mode].summary;
+    elements.feedbackMessage.textContent = pool.length
+      ? MODE_META[mode].summary
+      : "Pick a source and add sentences to start.";
     elements.scoreButton.disabled = true;
     elements.clearButton.disabled = !hasInput;
     elements.sentenceInput.disabled = true;
@@ -1452,31 +1522,46 @@ function renderPracticePanel() {
   elements.promptStage.className = `prompt-stage ${statusClass}`;
   elements.promptStage.classList.toggle("hidden", isReview);
   elements.entryPanel.classList.toggle("hidden", isReview);
-  elements.englishGloss.textContent = attempt.sentence.english;
+  elements.englishGloss.textContent = attempt.sentence.english || "";
 
-  if (isPreview) {
+  if (isListen) {
+    elements.countdownPill.textContent = `${attempt.playCount} of ${replayLimit} plays`;
+  } else if (isPreview) {
     elements.countdownPill.textContent = `${(attempt.remainingPreviewMs / 1000).toFixed(1)}s`;
-    elements.sentenceDisplay.innerHTML = renderSentenceHtml(attempt.tokens);
-    elements.feedbackMessage.textContent = "Memorize it.";
   } else if (isTyping || isPaused) {
     elements.countdownPill.textContent =
       mode === "copy" ? "Visible" : `${attempt.hiddenCount} blank${attempt.hiddenCount === 1 ? "" : "s"}`;
+  } else if (isReview) {
+    elements.countdownPill.textContent = "Saved";
+  }
+
+  if (isListen && !isReview) {
+    elements.sentenceDisplay.innerHTML = attempt.audioPlaying
+      ? `<span class="listen-placeholder">Playing…</span>`
+      : `<span class="listen-placeholder">Tap play to hear the sentence.</span>`;
+  } else if (isPreview) {
+    elements.sentenceDisplay.innerHTML = renderSentenceHtml(attempt.tokens);
+  } else if (isTyping || isPaused) {
     elements.sentenceDisplay.innerHTML =
       mode === "copy"
         ? renderSentenceHtml(attempt.tokens)
         : renderSentenceHtml(attempt.tokens, attempt.hiddenIndexes);
-    elements.feedbackMessage.textContent = isPaused
-      ? "Paused."
-      : mode === "copy"
-        ? "Type what you see."
-        : "Type from memory.";
   } else if (isReview) {
-    elements.countdownPill.textContent = "Saved";
     elements.sentenceDisplay.innerHTML = renderSentenceHtml(attempt.tokens, attempt.hiddenIndexes, {
       reveal: true,
-      highlightHidden: attempt.uiMode !== "copy",
+      highlightHidden: mode === "flash",
     });
-    elements.feedbackMessage.textContent = "Scored.";
+  }
+
+  if (isListen) {
+    const reached = attempt.playCount >= replayLimit;
+    elements.audioPlayButton.disabled = reached;
+    elements.audioPlayButton.querySelector(".audio-label").textContent = attempt.playCount === 0
+      ? "Play audio"
+      : reached
+        ? "No replays left"
+        : "Replay";
+    elements.audioReplayInfo.textContent = `${attempt.playCount} of ${replayLimit} plays`;
   }
 
   if (attempt.hiddenIndexes.length && isReview) {
@@ -1491,6 +1576,16 @@ function renderPracticePanel() {
     elements.hiddenWordsRow.classList.add("hidden");
   }
 
+  let feedback;
+  if (isPaused) feedback = "Paused.";
+  else if (isPreview) feedback = mode === "flash" ? "Memorize it." : "Get ready.";
+  else if (isTyping && mode === "copy") feedback = "Type what you see.";
+  else if (isTyping && mode === "flash") feedback = "Type from memory.";
+  else if (isTyping && mode === "listen") feedback = "Type what you heard.";
+  else if (isReview) feedback = "Scored.";
+  else feedback = MODE_META[mode].summary;
+  elements.feedbackMessage.textContent = feedback;
+
   elements.liveTimer.textContent = formatSeconds(getCurrentElapsedMs());
   elements.attemptErrors.textContent = String(attempt.errors);
   elements.currentStreak.textContent = String(session.currentStreak);
@@ -1504,22 +1599,23 @@ function renderResultCard() {
     elements.resultCard.classList.remove("is-review");
     return;
   }
-
   elements.resultCard.classList.remove("hidden");
   const result = currentAttempt.result;
   const hiddenWords = currentAttempt.hiddenIndexes
     .map((index) => currentAttempt.tokens[index].value)
     .join(", ");
-  const reviewNote = currentAttempt.uiMode === "copy"
-    ? "Copy rep."
-    : hiddenWords
-      ? `Hidden: ${hiddenWords}.`
-      : `${currentAttempt.hiddenCount} blank${currentAttempt.hiddenCount === 1 ? "" : "s"}.`;
+  const modeNote = currentAttempt.mode === "copy"
+    ? "See rep."
+    : currentAttempt.mode === "listen"
+      ? `Listen rep (${currentAttempt.playCount} play${currentAttempt.playCount === 1 ? "" : "s"}).`
+      : hiddenWords
+        ? `Hidden: ${hiddenWords}.`
+        : `${currentAttempt.hiddenCount} blank${currentAttempt.hiddenCount === 1 ? "" : "s"}.`;
 
   elements.resultCard.classList.add("is-review");
   elements.resultSummary.textContent = result.clean ? "Clean" : "Retry";
   elements.resultTitle.textContent = `${formatPercent(result.accuracy)} accuracy · ${formatWpm(result.wpm)}`;
-  elements.resultBody.textContent = `${result.clean ? "Clean hit." : "Another pass recommended."} ${reviewNote}`;
+  elements.resultBody.textContent = `${result.clean ? "Clean hit." : "Another pass recommended."} ${modeNote}`;
   elements.resultMetrics.innerHTML = buildResultMetrics(result);
   elements.resultDiff.innerHTML = buildDiffHtml(currentAttempt.sentence.text, result.typedText);
 }
@@ -1535,42 +1631,44 @@ function renderSessionPanel() {
   elements.sessionCleanRate.textContent = `${formatWholePercent(average(session.cleanAttempts * 100, session.attempts))} clean hits`;
   elements.sessionAverageAccuracy.textContent = formatPercent(sessionAverageAccuracy);
   elements.sessionAverageAccuracyDetail.textContent =
-    session.attempts > 0 ? `${session.attempts} sentence${session.attempts === 1 ? "" : "s"} in this run` : "Session average";
+    session.attempts > 0
+      ? `${session.attempts} sentence${session.attempts === 1 ? "" : "s"} in this run`
+      : "Session average";
   elements.sessionAverageSpeed.textContent = formatWpm(sessionAverageWpm);
   elements.sessionBestStreak.textContent = `Best streak: ${session.bestStreak}`;
   elements.lifetimeAverageAccuracy.textContent = formatPercent(lifetimeAverageAccuracy);
-  elements.lifetimeAverageSpeed.textContent = `${formatWpm(lifetimeAverageWpm)} lifetime speed`;
-  elements.lifetimeTotals.textContent = `${state.totals.attempts} attempts | ${formatStudyTime(state.totals.totalMs)} studied`;
+  elements.lifetimeAverageSpeed.textContent = `${formatWpm(lifetimeAverageWpm)} lifetime`;
+  elements.lifetimeTotals.textContent = `${state.totals.attempts} attempts · ${formatStudyTime(state.totals.totalMs)} studied`;
 }
 
 function renderFocusPanel() {
   const mode = getMode();
-  const ranked = SENTENCES.map((sentence) => {
-    const stats = getSentenceStatsForView(sentence.id, mode);
-    const avgAccuracy = getAverageAccuracy(stats);
-    const avgWpm = getAverageWpm(stats);
-    const freshness = stats.lastSeenAt ? Math.min((Date.now() - stats.lastSeenAt) / 60000, 240) : 120;
-    const weight =
-      (stats.attempts ? 0 : 24) +
-      (100 - avgAccuracy) * 0.8 +
-      Math.max(0, 16 - avgWpm) +
-      freshness * 0.05;
-
-    return {
-      sentence,
-      stats,
-      avgAccuracy,
-      avgWpm,
-      weight,
-    };
-  })
+  const pool = getActiveSentences();
+  const ranked = pool
+    .map((sentence) => {
+      const stats = getSentenceStatsForView(sentence.key, mode);
+      const avgAccuracy = getAverageAccuracy(stats);
+      const avgWpm = getAverageWpm(stats);
+      const freshness = stats.lastSeenAt ? Math.min((Date.now() - stats.lastSeenAt) / 60000, 240) : 120;
+      const weight =
+        (stats.attempts ? 0 : 24) +
+        (100 - avgAccuracy) * 0.8 +
+        Math.max(0, 16 - avgWpm) +
+        freshness * 0.05;
+      return { sentence, stats, avgAccuracy, avgWpm, weight };
+    })
     .sort((left, right) => right.weight - left.weight)
     .slice(0, 4);
+
+  if (!ranked.length) {
+    elements.focusSentences.innerHTML = `<p class="focus-empty">No sentences to focus on yet.</p>`;
+    return;
+  }
 
   elements.focusSentences.innerHTML = ranked
     .map(({ sentence, stats, avgAccuracy, avgWpm }) => {
       const meta = stats.attempts
-        ? `${formatPercent(avgAccuracy)} avg accuracy · ${formatWpm(avgWpm)}`
+        ? `${formatPercent(avgAccuracy)} avg · ${formatWpm(avgWpm)}`
         : "New";
       return `
         <div class="focus-item">
@@ -1582,117 +1680,138 @@ function renderFocusPanel() {
     .join("");
 }
 
-function renderModeStats() {
-  elements.modeStatsGrid.innerHTML = UI_MODE_ORDER.map((mode) => {
-    const stats = getModeStatsForView(mode);
-    const isCurrent = mode === getMode();
-    return `
-      <article class="mode-stat-card${isCurrent ? " is-current" : ""}">
-        <p class="mode-stat-label">${UI_MODE_META[mode].label}</p>
-        <h3>${UI_MODE_META[mode].title}</h3>
-        <div class="mode-stat-rows">
-          <div class="mode-stat-row">
-            <span>Attempts</span>
-            <strong>${stats.attempts}</strong>
-          </div>
-          <div class="mode-stat-row">
-            <span>Avg accuracy</span>
-            <strong>${formatPercent(getAverageAccuracy(stats))}</strong>
-          </div>
-          <div class="mode-stat-row">
-            <span>Avg speed</span>
-            <strong>${formatWpm(getAverageWpm(stats))}</strong>
-          </div>
-          <div class="mode-stat-row">
-            <span>Clean hits</span>
-            <strong>${formatWholePercent(average(stats.cleanAttempts * 100, stats.attempts))}</strong>
-          </div>
-        </div>
-      </article>
-    `;
-  }).join("");
+function renderSourceTabs() {
+  elements.sourceButtons.forEach((button) => {
+    const isActive = button.dataset.source === state.settings.sourceKind;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+  elements.orderButtons.forEach((button) => {
+    const isActive = button.dataset.order === state.settings.orderMode;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
+  });
+  const isHvpt = state.settings.sourceKind === "hvpt";
+  elements.hvptPicker.classList.toggle("hidden", !isHvpt);
+  elements.addForm.classList.toggle("hidden", isHvpt);
 }
 
-function renderSentenceBank() {
+function renderHvptPicker() {
+  if (state.settings.sourceKind !== "hvpt") return;
+  if (hvpt.loading) {
+    elements.hvptStatus.textContent = "Loading decks…";
+    elements.hvptDeckSelect.innerHTML = `<option>Loading…</option>`;
+    elements.hvptDeckSelect.disabled = true;
+    elements.hvptGroupSelect.innerHTML = `<option>Loading…</option>`;
+    elements.hvptGroupSelect.disabled = true;
+    return;
+  }
+  if (hvpt.error) {
+    elements.hvptStatus.textContent = hvpt.error;
+    elements.hvptDeckSelect.innerHTML = `<option>—</option>`;
+    elements.hvptDeckSelect.disabled = true;
+    elements.hvptGroupSelect.innerHTML = `<option>—</option>`;
+    elements.hvptGroupSelect.disabled = true;
+    return;
+  }
+  if (!hvpt.loaded) {
+    elements.hvptStatus.textContent = "";
+    return;
+  }
+  if (!hvpt.decks.length) {
+    elements.hvptStatus.textContent = "No HVPT decks found. Build one in the HVPT Voice Lab.";
+    elements.hvptDeckSelect.innerHTML = `<option>—</option>`;
+    elements.hvptDeckSelect.disabled = true;
+    elements.hvptGroupSelect.innerHTML = `<option>—</option>`;
+    elements.hvptGroupSelect.disabled = true;
+    return;
+  }
+
+  const deck = getHvptDeck();
+  elements.hvptDeckSelect.disabled = false;
+  elements.hvptDeckSelect.innerHTML = hvpt.decks
+    .map(
+      (d) => `<option value="${escapeHtml(d.id)}" ${d.id === deck?.id ? "selected" : ""}>${escapeHtml(d.name || "Untitled deck")} · ${(d.phrases || []).length}</option>`,
+    )
+    .join("");
+
+  const groups = deck?.groups || [];
+  elements.hvptGroupSelect.disabled = !groups.length;
+  const groupOptions = [
+    `<option value="">All phrases${deck ? ` (${(deck.phrases || []).length})` : ""}</option>`,
+  ].concat(
+    groups.map(
+      (group) =>
+        `<option value="${escapeHtml(group.id)}" ${group.id === state.settings.hvptGroupId ? "selected" : ""}>${escapeHtml(group.name || "Group")} · ${(group.phraseIds || []).length}</option>`,
+    ),
+  );
+  elements.hvptGroupSelect.innerHTML = groupOptions.join("");
+
+  const active = getActiveSentences();
+  elements.hvptStatus.textContent = active.length
+    ? `${active.length} phrase${active.length === 1 ? "" : "s"} ready.`
+    : "No phrases in this selection.";
+}
+
+function renderLibrary() {
+  const pool = getActiveSentences();
   const mode = getMode();
-  const sectionMeta = {
-    new: { title: "New", empty: "No new lines right now." },
-    progress: { title: "In progress", empty: "Nothing in rotation." },
-    mastered: { title: "Mastered", empty: "No mastered lines yet." },
-  };
+  elements.libraryCount.textContent = `${pool.length} sentence${pool.length === 1 ? "" : "s"}`;
+  const queued = queuedSentenceKey && pool.find((s) => s.key === queuedSentenceKey);
+  elements.libraryQueue.classList.toggle("hidden", !queued);
+  if (queued) elements.libraryQueue.textContent = `Queued: ${queued.text}`;
 
-  const items = SENTENCES.map((sentence, index) => {
-    const stats = getSentenceStatsForView(sentence.id, mode);
-    const attempts = stats.attempts;
-    const mastery = attempts ? getMasteryPercent(stats) : 0;
-    const section = getSentenceSection(stats);
-    const isCurrent = currentAttempt?.sentence.id === sentence.id;
+  elements.libraryEmpty.classList.toggle("hidden", pool.length > 0);
+  if (!pool.length) {
+    elements.libraryEmpty.textContent = state.settings.sourceKind === "hvpt"
+      ? "No phrases in this selection."
+      : "No custom sentences yet. Add one above.";
+    elements.sentenceList.innerHTML = "";
+    return;
+  }
 
-    return {
-      sentence,
-      stats,
-      attempts,
-      mastery,
-      section,
-      isCurrent,
-      index,
-    };
-  });
-
-  const sortSectionItems = (sectionItems, section) =>
-    sectionItems.sort((left, right) => {
-      if (left.isCurrent !== right.isCurrent) {
-        return left.isCurrent ? -1 : 1;
-      }
-
-      if (section === "progress") {
-        return left.mastery - right.mastery || left.index - right.index;
-      }
-
-      if (section === "mastered") {
-        return right.mastery - left.mastery || right.attempts - left.attempts || left.index - right.index;
-      }
-
-      return left.index - right.index;
-    });
-
-  elements.sentenceBank.innerHTML = Object.entries(sectionMeta)
-    .map(([section, meta]) => {
-      const sectionItems = sortSectionItems(
-        items.filter((item) => item.section === section),
-        section
-      );
-
-      const listHtml = sectionItems.length
-        ? sectionItems
-            .map(({ sentence, attempts, mastery, isCurrent }) => `
-              <article class="bank-item is-${section}${isCurrent ? " is-current" : ""}">
-                <div class="bank-item-top">
-                  <p class="bank-russian">${escapeHtml(sentence.text)}</p>
-                  <span class="bank-score-pill">${attempts ? `${mastery}%` : "New"}</span>
-                </div>
-                <div class="bank-meter" aria-hidden="true">
-                  <span style="width:${attempts ? mastery : 6}%"></span>
-                </div>
-                <div class="bank-meta-row">
-                  <span>${attempts ? formatRepCount(attempts) : "Not started"}</span>
-                  <span class="${isCurrent ? "bank-current-tag" : ""}">${isCurrent ? "Current" : meta.title}</span>
-                </div>
-              </article>
-            `)
-            .join("")
-        : `<p class="bank-empty">${meta.empty}</p>`;
+  elements.sentenceList.innerHTML = pool
+    .map((sentence, index) => {
+      const stats = getSentenceStatsEntry(sentence.key);
+      const modeStats = stats.byMode[mode] || createSentenceModeStats();
+      const attempts = modeStats.attempts;
+      const mastery = attempts ? getMasteryPercent(modeStats) : 0;
+      const section = getSentenceSection(modeStats);
+      const isCurrent = currentAttempt?.sentence?.key === sentence.key;
+      const isQueued = queuedSentenceKey === sentence.key;
+      const sectionLabel = attempts ? (section === "mastered" ? "Mastered" : "In progress") : "New";
+      const hasAudio = Boolean(sentence.audioUrl) || "speechSynthesis" in window;
+      const audioButton = hasAudio
+        ? `<button class="row-action row-play" type="button" data-action="play" data-key="${escapeHtml(sentence.key)}" title="Listen" aria-label="Listen">▶</button>`
+        : "";
+      const picked = isCurrent
+        ? `<span class="row-current">Current</span>`
+        : isQueued
+          ? `<span class="row-current">Queued</span>`
+          : `<button class="row-action row-pick" type="button" data-action="pick" data-key="${escapeHtml(sentence.key)}" title="Practice this one" aria-label="Practice this one">↦</button>`;
+      const deleteButton = sentence.source === "custom"
+        ? `<button class="row-action row-delete" type="button" data-action="delete" data-id="${escapeHtml(sentence.id)}" title="Delete" aria-label="Delete">✕</button>`
+        : "";
 
       return `
-        <section class="bank-section">
-          <div class="bank-section-header">
-            <span class="bank-section-title">${meta.title}</span>
-            <span class="bank-section-count">${sectionItems.length}</span>
+        <article class="sentence-row${isCurrent ? " is-current" : ""}${isQueued ? " is-queued" : ""}" data-index="${index}">
+          <div class="sentence-row-body">
+            <p class="row-russian">${escapeHtml(sentence.text)}</p>
+            ${sentence.english ? `<p class="row-english">${escapeHtml(sentence.english)}</p>` : ""}
+            <div class="row-meter" aria-hidden="true">
+              <span style="width:${attempts ? mastery : 4}%"></span>
+            </div>
+            <div class="row-meta">
+              <span class="row-section is-${section}">${sectionLabel}</span>
+              <span>${attempts ? `${mastery}% · ${formatRepCount(attempts)}` : "Not started"}</span>
+            </div>
           </div>
-          <div class="bank-list">
-            ${listHtml}
+          <div class="sentence-row-actions">
+            ${audioButton}
+            ${picked}
+            ${deleteButton}
           </div>
-        </section>
+        </article>
       `;
     })
     .join("");
@@ -1705,8 +1824,10 @@ function renderButtons() {
   const hasSession = Boolean(currentAttempt) && !isReview;
   const canPause = phase === "preview" || phase === "typing";
   const showStart = !currentAttempt || isPaused;
+  const pool = getActiveSentences();
 
   elements.startButton.classList.toggle("hidden", !showStart);
+  elements.startButton.disabled = !pool.length;
   elements.heroSessionActions.classList.toggle("hidden", !hasSession);
   elements.pauseButton.classList.toggle("hidden", !canPause);
   elements.startButton.textContent = isPaused ? "Resume" : "Start";
@@ -1718,39 +1839,31 @@ function renderButtons() {
   elements.practiceActions.classList.toggle("is-hidden", isReview);
   elements.practiceActions.classList.toggle("keyboard-open", keyboardOpen);
   elements.advanceButton.disabled = !isReview;
-  elements.replayButton.disabled = !isReview;
+  elements.replayCurrentButton.disabled = !isReview;
+  elements.addButton.disabled = !elements.addRussian.value.trim();
 }
 
 function render() {
   renderHero();
+  renderSourceTabs();
+  renderHvptPicker();
   renderPracticePanel();
   renderResultCard();
   renderSessionPanel();
   renderFocusPanel();
-  renderModeStats();
-  renderSentenceBank();
+  renderLibrary();
   renderButtons();
 }
 
+// ───────── events ─────────
+
 function handleBeforeInput(event) {
-  if (!currentAttempt || currentAttempt.phase !== "typing") {
-    return;
-  }
-
-  if (event.inputType !== "insertText") {
-    return;
-  }
-
+  if (!currentAttempt || currentAttempt.phase !== "typing") return;
+  if (event.inputType !== "insertText") return;
   const typed = event.data || "";
-  if (typed.length !== 1) {
-    return;
-  }
-
+  if (typed.length !== 1) return;
   const input = elements.sentenceInput;
-  if (input.selectionStart !== input.selectionEnd || input.selectionStart !== input.value.length) {
-    return;
-  }
-
+  if (input.selectionStart !== input.selectionEnd || input.selectionStart !== input.value.length) return;
   const expected = currentAttempt.sentence.text[input.value.length] || "";
   if (typed !== expected) {
     currentAttempt.errors += 1;
@@ -1763,7 +1876,7 @@ function handleInput() {
   renderButtons();
 }
 
-function handleKeydown(event) {
+function handleInputKeydown(event) {
   if (event.key === "Enter" && !event.shiftKey) {
     event.preventDefault();
     scoreAttempt();
@@ -1771,20 +1884,11 @@ function handleKeydown(event) {
 }
 
 function updateKeyboardState() {
-  if (!window.visualViewport) {
-    return;
-  }
-
+  if (!window.visualViewport) return;
   const currentHeight = window.visualViewport.height;
-  if (currentHeight > visualViewportBaseline * 0.9) {
-    visualViewportBaseline = currentHeight;
-  }
-
+  if (currentHeight > visualViewportBaseline * 0.9) visualViewportBaseline = currentHeight;
   const nextKeyboardOpen = currentHeight < visualViewportBaseline * 0.75;
-  if (nextKeyboardOpen === keyboardOpen) {
-    return;
-  }
-
+  if (nextKeyboardOpen === keyboardOpen) return;
   keyboardOpen = nextKeyboardOpen;
   renderButtons();
 }
@@ -1798,10 +1902,7 @@ function isInteractiveShortcutTarget(target) {
 }
 
 function handleGlobalKeydown(event) {
-  if (event.defaultPrevented) {
-    return;
-  }
-
+  if (event.defaultPrevented) return;
   const target = event.target;
   const textEntry = isTextEntryTarget(target);
 
@@ -1813,9 +1914,7 @@ function handleGlobalKeydown(event) {
     return;
   }
 
-  if (textEntry || isInteractiveShortcutTarget(target)) {
-    return;
-  }
+  if (textEntry || isInteractiveShortcutTarget(target)) return;
 
   if (event.key === " " && !event.repeat) {
     event.preventDefault();
@@ -1829,6 +1928,44 @@ function handleGlobalKeydown(event) {
   }
 }
 
+function handleAudioPlayerEvent(kind) {
+  if (!currentAttempt || currentAttempt.mode !== "listen") return;
+  if (kind === "ended" || kind === "error" || kind === "pause") {
+    if (kind !== "pause" || elements.audioPlayer.ended) {
+      currentAttempt.audioPlaying = false;
+      renderPracticePanel();
+    }
+  } else if (kind === "play") {
+    currentAttempt.audioPlaying = true;
+    renderPracticePanel();
+  }
+}
+
+function handleAddFormKeydown(event) {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    addCustomSentence();
+  }
+}
+
+function handleListClick(event) {
+  const target = event.target.closest("[data-action]");
+  if (!target) return;
+  const action = target.dataset.action;
+  if (action === "play") {
+    const sentence = getSentenceByKey(target.dataset.key);
+    if (sentence) playSentenceAudio(sentence);
+    return;
+  }
+  if (action === "pick") {
+    queueSentence(target.dataset.key);
+    return;
+  }
+  if (action === "delete") {
+    deleteCustomSentence(target.dataset.id);
+  }
+}
+
 function attachEvents() {
   elements.startButton.addEventListener("click", startOrResume);
   elements.pauseButton.addEventListener("click", pauseAttempt);
@@ -1837,34 +1974,53 @@ function attachEvents() {
   elements.scoreButton.addEventListener("click", scoreAttempt);
   elements.clearButton.addEventListener("click", clearInput);
   elements.advanceButton.addEventListener("click", nextSentence);
-  elements.replayButton.addEventListener("click", replayCurrentSentence);
+  elements.replayCurrentButton.addEventListener("click", replayCurrentSentence);
   elements.missingMinus.addEventListener("click", () => adjustHiddenCount(-1));
   elements.missingPlus.addEventListener("click", () => adjustHiddenCount(1));
   elements.previewMinus.addEventListener("click", () => adjustPreviewSeconds(-1));
   elements.previewPlus.addEventListener("click", () => adjustPreviewSeconds(1));
+  elements.replayMinus.addEventListener("click", () => adjustReplayLimit(-1));
+  elements.replayPlus.addEventListener("click", () => adjustReplayLimit(1));
   elements.modeButtons.forEach((button) => {
     button.addEventListener("click", () => setMode(button.dataset.mode));
   });
+  elements.sourceButtons.forEach((button) => {
+    button.addEventListener("click", () => setSource(button.dataset.source));
+  });
+  elements.orderButtons.forEach((button) => {
+    button.addEventListener("click", () => setOrderMode(button.dataset.order));
+  });
+  elements.hvptDeckSelect.addEventListener("change", (event) => setHvptDeck(event.target.value));
+  elements.hvptGroupSelect.addEventListener("change", (event) => setHvptGroup(event.target.value));
+  elements.audioPlayButton.addEventListener("click", triggerAttemptAudio);
+  elements.audioPlayer.addEventListener("play", () => handleAudioPlayerEvent("play"));
+  elements.audioPlayer.addEventListener("pause", () => handleAudioPlayerEvent("pause"));
+  elements.audioPlayer.addEventListener("ended", () => handleAudioPlayerEvent("ended"));
+  elements.audioPlayer.addEventListener("error", () => handleAudioPlayerEvent("error"));
   elements.sentenceInput.addEventListener("beforeinput", handleBeforeInput);
   elements.sentenceInput.addEventListener("input", handleInput);
-  elements.sentenceInput.addEventListener("keydown", handleKeydown);
-  elements.sentenceInput.addEventListener("paste", (event) => {
-    event.preventDefault();
-  });
+  elements.sentenceInput.addEventListener("keydown", handleInputKeydown);
+  elements.sentenceInput.addEventListener("paste", (event) => event.preventDefault());
+  elements.addRussian.addEventListener("keydown", handleAddFormKeydown);
+  elements.addEnglish.addEventListener("keydown", handleAddFormKeydown);
+  elements.addRussian.addEventListener("input", renderButtons);
+  elements.addButton.addEventListener("click", addCustomSentence);
+  elements.sentenceList.addEventListener("click", handleListClick);
   document.addEventListener("keydown", handleGlobalKeydown);
-  window.addEventListener("online", () => {
-    void syncStateFromServer();
-  });
+  window.addEventListener("online", () => { void syncStateFromServer(); });
   window.addEventListener("resize", updateKeyboardState);
   window.visualViewport?.addEventListener("resize", updateKeyboardState);
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) {
-      void syncStateFromServer();
-    }
+    if (!document.hidden) void syncStateFromServer();
   });
+  if ("speechSynthesis" in window) {
+    window.speechSynthesis.onvoiceschanged = () => ensureSpeechVoice();
+    ensureSpeechVoice();
+  }
 }
 
 attachEvents();
 updateKeyboardState();
+if (state.settings.sourceKind === "hvpt") void loadHvpt();
 render();
 void syncStateFromServer();
