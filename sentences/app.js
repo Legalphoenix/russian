@@ -137,6 +137,8 @@ const hvpt = {
   error: "",
   decks: [],
 };
+const hvptVariantCache = new Map();
+const hvptVariantPending = new Map();
 
 // ───────── state helpers ─────────
 
@@ -473,6 +475,7 @@ async function loadHvpt() {
     hvpt.decks = Array.isArray(payload.decks) ? payload.decks : [];
     hvpt.loaded = true;
     hvpt.error = "";
+    prewarmActiveHvpt();
   } catch (error) {
     hvpt.error = error.message || "Could not load HVPT decks.";
     hvpt.loaded = false;
@@ -536,6 +539,18 @@ function getActiveSentences() {
     return getHvptPhrases().filter((phrase) => String(phrase.text || "").trim()).map(hvptPhraseToSentence);
   }
   return state.customSentences.map(customSentenceToSentence);
+}
+
+function prewarmHvptVariants(phrases, limit = 8) {
+  const targets = phrases.slice(0, limit).filter((phrase) => phrase && phrase.id && !hvptVariantCache.has(phrase.id));
+  targets.forEach((phrase) => {
+    void fetchHvptVariants(phrase);
+  });
+}
+
+function prewarmActiveHvpt() {
+  if (state.settings.sourceKind !== "hvpt" || !hvpt.loaded) return;
+  prewarmHvptVariants(getHvptPhrases());
 }
 
 function getSentenceByKey(key) {
@@ -929,22 +944,75 @@ function ensureSpeechVoice() {
   return speechVoice;
 }
 
+function playAudioUrl(rawUrl, sentence) {
+  try {
+    const url = new URL(rawUrl, window.location.href).toString();
+    elements.audioPlayer.src = url;
+    const playPromise = elements.audioPlayer.play();
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch(() => speakSentence(sentence));
+    }
+    return true;
+  } catch {
+    return speakSentence(sentence);
+  }
+}
+
+function pickHvptVariantUrl(variants) {
+  if (!Array.isArray(variants) || !variants.length) return "";
+  const variant = variants[Math.floor(Math.random() * variants.length)];
+  return variant && variant.url ? variant.url : "";
+}
+
+async function fetchHvptVariants(phrase) {
+  if (!phrase || !phrase.id) return [];
+  if (hvptVariantCache.has(phrase.id)) return hvptVariantCache.get(phrase.id);
+  if (hvptVariantPending.has(phrase.id)) return hvptVariantPending.get(phrase.id);
+
+  const payload = {
+    text: phrase.text,
+    note: phrase.note || "",
+    instructions: phrase.instructions || "",
+    speed: typeof phrase.speed === "number" ? phrase.speed : 1,
+    voices: Array.isArray(phrase.voices) ? phrase.voices : [],
+  };
+  if (!payload.text || !payload.voices.length) return [];
+
+  const request = (async () => {
+    try {
+      const response = await window.fetch(`${HVPT_API_BASE}/generate`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error(`HVPT generate failed (${response.status})`);
+      const data = await response.json();
+      const variants = Array.isArray(data.variants) ? data.variants : [];
+      hvptVariantCache.set(phrase.id, variants);
+      return variants;
+    } catch {
+      return [];
+    } finally {
+      hvptVariantPending.delete(phrase.id);
+    }
+  })();
+  hvptVariantPending.set(phrase.id, request);
+  return request;
+}
+
 function playSentenceAudio(sentence) {
   if (!sentence) return false;
   stopAudio();
-  if (sentence.audioUrl) {
-    try {
-      const url = new URL(sentence.audioUrl, window.location.href).toString();
-      elements.audioPlayer.src = url;
-      const playPromise = elements.audioPlayer.play();
-      if (playPromise && typeof playPromise.catch === "function") {
-        playPromise.catch(() => speakSentence(sentence));
-      }
-      return true;
-    } catch {
-      return speakSentence(sentence);
-    }
+
+  if (sentence.source === "hvpt" && sentence.phrase) {
+    const cachedUrl = pickHvptVariantUrl(hvptVariantCache.get(sentence.phrase.id));
+    if (cachedUrl) return playAudioUrl(cachedUrl, sentence);
+    // No cache yet — kick off a fetch for future plays and fall through to TTS for now.
+    void fetchHvptVariants(sentence.phrase);
   }
+
+  if (sentence.audioUrl) return playAudioUrl(sentence.audioUrl, sentence);
   return speakSentence(sentence);
 }
 
@@ -1180,6 +1248,7 @@ function setSource(kind) {
   stopLiveInterval();
   currentAttempt = null;
   if (kind === "hvpt" && !hvpt.loaded && !hvpt.loading) void loadHvpt();
+  prewarmActiveHvpt();
   render();
 }
 
@@ -1203,6 +1272,7 @@ function setHvptDeck(id) {
   stopLiveInterval();
   currentAttempt = null;
   saveState();
+  prewarmActiveHvpt();
   render();
 }
 
@@ -1216,6 +1286,7 @@ function setHvptGroup(id) {
   stopLiveInterval();
   currentAttempt = null;
   saveState();
+  prewarmActiveHvpt();
   render();
 }
 
