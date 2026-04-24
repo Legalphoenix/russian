@@ -13,6 +13,13 @@ const categoryMeta = {
   plur: { label: "Plural", shortLabel: "plur", nounLabel: "plural noun" },
 };
 
+const categoryNames = {
+  masc: "masculine",
+  fem: "feminine",
+  neut: "neuter",
+  plur: "plural",
+};
+
 const familyMeta = {
   my: { label: "мой family", display: "мой / моя / моё / мои", colorClass: "family-my" },
   yourSg: { label: "твой family", display: "твой / твоя / твоё / твои", colorClass: "family-your-sg" },
@@ -112,6 +119,36 @@ function buildExplanation(owner, category, noun) {
     return `${owner.label} uses the invariant form ${answer}, so the noun column does not change the answer here.`;
   }
   return `${owner.label} picks the ${familyMeta[owner.familyKey].label}. Because ${noun.word} is a ${categoryMeta[category].nounLabel}, the correct form is ${answer}.`;
+}
+
+function describeChoiceContrast(choice, item) {
+  const owner = ownerById[item.ownerId];
+  const choiceCategories = categories.filter((cat) => owner.forms[cat] === choice);
+
+  if (choiceCategories.length && choice !== item.answer) {
+    return `You chose ${choice}, the ${formatCategoryList(choiceCategories)} form for ${owner.label}. ${item.noun.word} is ${categoryNames[item.category]}, so this card needs ${item.answer}.`;
+  }
+
+  const matchingOwners = ownerRows.filter((row) => categories.some((cat) => row.forms[cat] === choice));
+  if (matchingOwners.length && choice !== item.answer) {
+    const labels = matchingOwners.map((row) => row.label).join(" / ");
+    return `You chose ${choice}, which belongs to ${labels}. This card uses ${owner.label}, so the answer is ${item.answer}.`;
+  }
+
+  if (choice && choice !== item.answer) {
+    return `You entered ${choice}. This card needs ${item.answer} for ${owner.label} + ${categoryNames[item.category]} ${item.noun.word}.`;
+  }
+
+  if (invariantFamilies.has(owner.familyKey)) {
+    return `${owner.label} is invariant, so ${item.answer} stays the same for masculine, feminine, neuter, and plural nouns.`;
+  }
+
+  return `${owner.label} uses ${familyMeta[owner.familyKey].display}; ${item.noun.word} selects the ${categoryNames[item.category]} form ${item.answer}.`;
+}
+
+function formatCategoryList(list) {
+  if (list.length === 1) return categoryNames[list[0]];
+  return list.map((cat) => categoryNames[cat]).join(" / ");
 }
 
 function makeItem({ phase, ownerId, category, noun, options, mode, subPrompt }) {
@@ -306,6 +343,7 @@ const el = {
   typingSubmit: document.querySelector("#typingSubmit"),
   listeningControls: document.querySelector("#listeningControls"),
   listenPlayBtn: document.querySelector("#listenPlayBtn"),
+  listenClueBtn: document.querySelector("#listenClueBtn"),
 };
 
 // ─── State Management ─────────────────────────────────────────
@@ -319,6 +357,7 @@ const defaultState = {
   currentSolved: false,
   currentChoice: null,
   hintVisible: false,
+  listeningFallbackVisible: false,
   cardStartedAt: null,
   savedAt: null,
   totalAnswered: 0,
@@ -353,6 +392,7 @@ function mergeState(candidate = {}) {
   merged.currentSolved = Boolean(candidate.currentSolved);
   merged.currentChoice = typeof candidate.currentChoice === "string" ? candidate.currentChoice : null;
   merged.hintVisible = Boolean(candidate.hintVisible);
+  merged.listeningFallbackVisible = Boolean(candidate.listeningFallbackVisible);
   merged.turn = Number.isFinite(candidate.turn) ? candidate.turn : 0;
   merged.savedAt = Number.isFinite(candidate.savedAt) ? candidate.savedAt : null;
   merged.totalAnswered = Number.isFinite(candidate.totalAnswered) ? candidate.totalAnswered : 0;
@@ -374,9 +414,15 @@ function saveState() {
 
 function ensureItemStats(itemId) {
   if (!state.itemStats[itemId]) {
-    state.itemStats[itemId] = { seen: 0, lastTurn: -1 };
+    state.itemStats[itemId] = { seen: 0, correct: 0, wrong: 0, streak: 0, lastTurn: -1 };
   }
-  return state.itemStats[itemId];
+  const s = state.itemStats[itemId];
+  s.seen = Number.isFinite(s.seen) ? s.seen : 0;
+  s.correct = Number.isFinite(s.correct) ? s.correct : 0;
+  s.wrong = Number.isFinite(s.wrong) ? s.wrong : 0;
+  s.streak = Number.isFinite(s.streak) ? s.streak : 0;
+  s.lastTurn = Number.isFinite(s.lastTurn) ? s.lastTurn : -1;
+  return s;
 }
 
 function ensureCellStats(id) {
@@ -453,20 +499,20 @@ function updatePhaseIfNeeded() {
   const before = state.currentPhase;
 
   if (state.currentPhase === "warmup") {
-    const ready = warmupItems.every((item) => ensureCellStats(item.cellId).correct > 0);
+    const ready = warmupItems.every((item) => ensureCellStats(item.cellId).correct >= 2);
     if (ready) state.currentPhase = "matrix";
   }
   if (state.currentPhase === "matrix") {
-    const allSeen = allCellIds.every((id) => ensureCellStats(id).seen > 0);
-    if (allSeen) state.currentPhase = "typing";
+    const allCorrect = allCellIds.every((id) => ensureCellStats(id).correct > 0);
+    if (allCorrect) state.currentPhase = "typing";
   }
   if (state.currentPhase === "typing") {
-    const typedSeen = typingItems.filter((item) => ensureItemStats(item.id).seen > 0).length;
-    if (typedSeen >= 16) state.currentPhase = "listening";
+    const typedCorrect = typingItems.every((item) => ensureItemStats(item.id).correct > 0);
+    if (typedCorrect) state.currentPhase = "listening";
   }
   if (state.currentPhase === "listening") {
-    const listenSeen = listeningItems.filter((item) => ensureItemStats(item.id).seen > 0).length;
-    if (listenSeen >= 16) state.currentPhase = "mastery";
+    const listenCorrect = listeningItems.every((item) => ensureItemStats(item.id).correct > 0);
+    if (listenCorrect) state.currentPhase = "mastery";
   }
 
   if (state.currentPhase !== before) {
@@ -477,20 +523,20 @@ function updatePhaseIfNeeded() {
 function phaseProgressText() {
   const phase = getActivePhase();
   if (phase === "warmup") {
-    const mastered = warmupItems.filter((item) => ensureCellStats(item.cellId).correct > 0).length;
-    return `${mastered} / ${warmupItems.length} mastered`;
+    const mastered = warmupItems.filter((item) => ensureCellStats(item.cellId).correct >= 2).length;
+    return `${mastered} / ${warmupItems.length} steady twice`;
   }
   if (phase === "matrix") {
-    const seen = allCellIds.filter((id) => ensureCellStats(id).seen > 0).length;
-    return `${seen} / ${allCellIds.length} cells seen`;
+    const correct = allCellIds.filter((id) => ensureCellStats(id).correct > 0).length;
+    return `${correct} / ${allCellIds.length} cells correct`;
   }
   if (phase === "typing") {
-    const typed = typingItems.filter((item) => ensureItemStats(item.id).seen > 0).length;
-    return `${typed} / ${typingItems.length} typed`;
+    const typed = typingItems.filter((item) => ensureItemStats(item.id).correct > 0).length;
+    return `${typed} / ${typingItems.length} typed correctly`;
   }
   if (phase === "listening") {
-    const listened = listeningItems.filter((item) => ensureItemStats(item.id).seen > 0).length;
-    return `${listened} / ${listeningItems.length} heard`;
+    const listened = listeningItems.filter((item) => ensureItemStats(item.id).correct > 0).length;
+    return `${listened} / ${listeningItems.length} heard correctly`;
   }
   const steady = allCellIds.filter((id) => cellMastery(id) >= 0.8).length;
   return `${steady} / ${allCellIds.length} cells steady`;
@@ -614,16 +660,28 @@ function recordAnswer(correct) {
   state.lastResponseMs = responseMs;
 
   if (correct) {
+    const interval =
+      typeof srsNextInterval === "function"
+        ? srsNextInterval(cellSt, responseMs, true, { speedTargetMs: 3000, baseInterval: 3, maxInterval: 32 })
+        : nextInterval(responseMs, cellSt.streak + 1);
+    itemSt.correct += 1;
+    itemSt.streak += 1;
     cellSt.correct += 1;
     cellSt.correctResponseMs += responseMs;
     cellSt.streak += 1;
-    cellSt.dueAt = state.turn + nextInterval(responseMs, cellSt.streak);
+    cellSt.dueAt = state.turn + interval;
     state.totalCorrect += 1;
     state.streak += 1;
   } else {
+    itemSt.wrong += 1;
+    itemSt.streak = 0;
     cellSt.wrong += 1;
     cellSt.streak = 0;
-    cellSt.dueAt = state.turn + 1;
+    const interval =
+      typeof srsNextInterval === "function"
+        ? srsNextInterval(cellSt, responseMs, false, { speedTargetMs: 3000, lapseInterval: 1 })
+        : 1;
+    cellSt.dueAt = state.turn + interval;
     state.streak = 0;
   }
 
@@ -710,6 +768,7 @@ function startNextCard() {
   state.currentSolved = false;
   state.currentChoice = null;
   state.hintVisible = false;
+  state.listeningFallbackVisible = false;
   state.lastResponseMs = null;
   state.cardStartedAt = Date.now();
   resetPauseTimer();
@@ -722,7 +781,7 @@ function startNextCard() {
     setTimeout(() => el.typingInput.focus(), 50);
   }
   if (phase === "listening" && item) {
-    setTimeout(() => speakWithBlank(item), 350);
+    setTimeout(() => speakFullSentence(item), 350);
   }
 }
 
@@ -744,31 +803,6 @@ function speakCurrentCard() {
   utterance.rate = 0.9;
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
-}
-
-function speakWithBlank(item) {
-  if (!hasSpeech || !item) return;
-  const synth = window.speechSynthesis;
-  synth.cancel();
-
-  if (item.listenPre) {
-    const u = new SpeechSynthesisUtterance(item.listenPre);
-    u.lang = "ru-RU";
-    u.rate = 0.9;
-    synth.speak(u);
-  }
-
-  const blank = new SpeechSynthesisUtterance("blank");
-  blank.lang = "en-US";
-  blank.rate = 0.85;
-  synth.speak(blank);
-
-  if (item.listenPost) {
-    const u = new SpeechSynthesisUtterance(item.listenPost);
-    u.lang = "ru-RU";
-    u.rate = 0.9;
-    synth.speak(u);
-  }
 }
 
 function speakFullSentence(item) {
@@ -808,6 +842,7 @@ function render() {
   el.listeningControls.style.display = isListening ? "" : "none";
   el.practiceOptions.style.display = isTyping ? "none" : "";
   el.audioButton.style.display = isListening ? "none" : "";
+  el.listenClueBtn.hidden = !isListening || state.currentSolved || state.listeningFallbackVisible || !hasSpeech;
 
   if (!isTyping) renderOptions();
 
@@ -822,14 +857,14 @@ function renderStepNav() {
   const isAuto = state.phaseOverride === "auto";
 
   el.stepNav.innerHTML =
-    `<button class="step-btn step-auto-btn ${isAuto ? "is-active" : ""}" data-step="auto">Auto</button>` +
+    `<button class="step-btn step-auto-btn ${isAuto ? "is-active" : ""}" data-step="auto" aria-pressed="${isAuto}" title="Follow the recommended step automatically">Auto</button>` +
     phaseOrder
       .map((phase) => {
         const meta = phaseMeta[phase];
         const active = activePhase === phase;
         const recommended = isAuto && state.currentPhase === phase;
         return `
-          <button class="step-btn ${active ? "is-active" : ""} ${recommended && !active ? "is-recommended" : ""}" data-step="${phase}">
+          <button class="step-btn ${active ? "is-active" : ""} ${recommended && !active ? "is-recommended" : ""}" data-step="${phase}" aria-pressed="${active}" ${active ? 'aria-current="step"' : ""}>
             <span class="step-num">${meta.num}</span>
             <span class="step-label">${meta.pill}</span>
           </button>`;
@@ -857,22 +892,25 @@ function renderPrompt(phase) {
   if (!item) return;
 
   const owner = ownerById[item.ownerId];
-  const family = familyMeta[owner.familyKey];
+  const showSupport = state.currentSolved || state.hintVisible;
 
   el.modeBadge.textContent = phaseMeta[phase].badge;
 
   if (phase === "listening") {
     el.promptLabel.textContent = "Listen and choose";
     if (state.currentSolved) {
-      el.promptText.innerHTML = `<span class="listen-revealed">${item.sentenceFull}</span>`;
+      el.promptText.innerHTML = `<span class="listen-revealed" lang="ru">${escapeHTML(item.sentenceFull)}</span>`;
       el.translationLine.textContent = item.translationFull;
+    } else if (state.listeningFallbackVisible || !hasSpeech) {
+      el.promptText.innerHTML = `<span class="listen-fallback" lang="ru">${formatPrompt(item.sentenceBlank)}</span>`;
+      el.translationLine.textContent = "";
     } else {
-      el.promptText.innerHTML = hasSpeech
-        ? '<span class="listen-placeholder">Listen to the sentence&hellip;</span>'
-        : `<span class="listen-fallback">${item.sentenceBlank}</span>`;
+      el.promptText.innerHTML = '<span class="listen-placeholder">Listen first. Reveal the written clue only if you need it.</span>';
       el.translationLine.textContent = "";
     }
-    el.promptChipRow.innerHTML = `<span class="prompt-chip"><strong>Owner</strong>${owner.label}</span>`;
+    el.promptChipRow.innerHTML = showSupport
+      ? `<span class="prompt-chip"><strong>Owner</strong><span lang="ru">${escapeHTML(owner.label)}</span></span>`
+      : "";
     el.subPrompt.textContent = state.currentSolved ? "" : item.subPrompt;
     el.choiceNudge.textContent = state.currentSolved
       ? "The full sentence is shown above."
@@ -880,15 +918,13 @@ function renderPrompt(phase) {
   } else {
     el.promptLabel.textContent = phase === "typing" ? "Type the form" : "Build the phrase";
     el.promptText.innerHTML = formatPrompt(item.prompt);
-    el.translationLine.textContent = item.translation;
-    el.promptChipRow.innerHTML = `
-      <span class="prompt-chip"><strong>Owner</strong>${owner.label}</span>
-      <span class="prompt-chip"><strong>Column</strong>${categoryMeta[item.category].label}</span>
-      <span class="prompt-chip ${family.colorClass}"><strong>Family</strong>${familyMeta[owner.familyKey].label}</span>
-    `;
+    el.translationLine.textContent = phase === "typing" && !state.currentSolved ? "" : item.translation;
+    el.promptChipRow.innerHTML = renderPromptChips(item, phase, showSupport);
     el.subPrompt.textContent = item.subPrompt;
     el.choiceNudge.textContent = state.currentSolved
-      ? "Good. Read the feedback, then move to the next card."
+      ? state.currentChoice === item.answer
+        ? "Correct. Read the feedback, then move to the next card."
+        : "Not quite. Read the feedback, then repair it on the next card."
       : phase === "typing"
         ? "Type the correct possessive form and press Enter."
         : "Tap the correct form below.";
@@ -912,8 +948,8 @@ function renderOptions() {
       if (state.currentSolved && correct) classes += " is-correct";
       if (state.currentSolved && selected && !correct) classes += " is-wrong";
       return `
-        <button class="${classes}" type="button" data-option="${option}" ${state.currentSolved ? "disabled" : ""}>
-          ${option}
+        <button class="${classes}" type="button" data-option="${escapeAttribute(option)}" lang="ru" aria-pressed="${selected}" ${state.currentSolved ? "disabled" : ""}>
+          ${escapeHTML(option)}
         </button>`;
     })
     .join("");
@@ -934,23 +970,24 @@ function renderFeedback(phase) {
 
   const correct = state.currentChoice === item.answer;
   const speedLine = describeSpeed(state.lastResponseMs, correct);
+  const contrastLine = describeChoiceContrast(state.currentChoice, item);
 
   el.feedbackCard.classList.remove("is-hidden");
   el.feedbackCard.classList.toggle("is-correct", correct);
   el.feedbackCard.classList.toggle("is-wrong", !correct);
 
-  if (phase === "typing" && !correct) {
+  if (!correct) {
     el.feedbackCard.innerHTML = `
-      <p class="feedback-title">The correct form is <strong>${item.answer}</strong>.</p>
-      <p class="feedback-body">${item.explanation} You typed "${state.currentChoice}". ${speedLine}</p>`;
+      <p class="feedback-title">Not quite. You chose <strong lang="ru">${escapeHTML(state.currentChoice)}</strong>; correct is <strong lang="ru">${escapeHTML(item.answer)}</strong>.</p>
+      <p class="feedback-body">${escapeHTML(contrastLine)} ${escapeHTML(item.explanation)} ${escapeHTML(speedLine)}</p>`;
   } else if (phase === "listening" && correct) {
     el.feedbackCard.innerHTML = `
       <p class="feedback-title">Correct! ${formatDuration(state.lastResponseMs)}</p>
-      <p class="feedback-body">${item.sentenceFull} &mdash; ${item.translationFull}. ${speedLine}</p>`;
+      <p class="feedback-body"><span lang="ru">${escapeHTML(item.sentenceFull)}</span> &mdash; ${escapeHTML(item.translationFull)}. ${escapeHTML(speedLine)}</p>`;
   } else {
     el.feedbackCard.innerHTML = `
-      <p class="feedback-title">${correct ? `Correct in ${formatDuration(state.lastResponseMs)}.` : `Use ${item.answer}.`}</p>
-      <p class="feedback-body">${item.explanation} ${speedLine}</p>`;
+      <p class="feedback-title">Correct in ${formatDuration(state.lastResponseMs)}.</p>
+      <p class="feedback-body">${escapeHTML(contrastLine)} ${escapeHTML(speedLine)}</p>`;
   }
 }
 
@@ -971,17 +1008,19 @@ function renderReferenceMatrix() {
   const rowMarkup = ownerRows
     .map((owner) => {
       const family = familyMeta[owner.familyKey];
-      const ownerHtml = `<div class="matrix-owner ${family.colorClass}">${owner.label}</div>`;
+      const ownerHtml = `<div class="matrix-owner ${family.colorClass}" lang="ru">${escapeHTML(owner.label)}</div>`;
       const cells = categories
         .map((cat) => {
           const id = cellId(owner.id, cat);
           const active = item?.cellId === id ? "is-active" : "";
           const mastery = cellMastery(id);
+          const word = owner.forms[cat];
+          const label = `${owner.label}, ${categoryMeta[cat].label}: ${word}. ${Math.round(mastery * 100)} percent mastery.`;
           return `
-            <div class="matrix-cell ${family.colorClass} ${active}" style="--mastery: ${mastery}" data-word="${owner.forms[cat]}">
-              <span class="matrix-word">${owner.forms[cat]}</span>
+            <button class="matrix-cell ${family.colorClass} ${active}" type="button" style="--mastery: ${mastery}" data-word="${escapeAttribute(word)}" lang="ru" aria-label="${escapeAttribute(label)}">
+              <span class="matrix-word">${escapeHTML(word)}</span>
               <span class="matrix-percent">${Math.round(mastery * 100)}%</span>
-            </div>`;
+            </button>`;
         })
         .join("");
       return ownerHtml + cells;
@@ -1057,8 +1096,22 @@ function renderButtons() {
 
 // ─── Helpers ──────────────────────────────────────────────────
 
+function renderPromptChips(item, phase, showSupport) {
+  const owner = ownerById[item.ownerId];
+  const family = familyMeta[owner.familyKey];
+  const ownerChip = `<span class="prompt-chip"><strong>Owner</strong><span lang="ru">${escapeHTML(owner.label)}</span></span>`;
+  const columnChip = `<span class="prompt-chip"><strong>Column</strong>${escapeHTML(categoryMeta[item.category].label)}</span>`;
+  const familyChip = `<span class="prompt-chip ${family.colorClass}"><strong>Family</strong>${escapeHTML(family.label)}</span>`;
+
+  if (phase === "warmup") return `${ownerChip}${columnChip}${familyChip}`;
+  if (phase === "matrix") return showSupport ? `${ownerChip}${columnChip}${familyChip}` : `${ownerChip}${columnChip}`;
+  if (phase === "typing") return showSupport ? `${ownerChip}${columnChip}${familyChip}` : `${ownerChip}${columnChip}`;
+  if (phase === "mastery") return showSupport ? `${ownerChip}${columnChip}${familyChip}` : "";
+  return ownerChip;
+}
+
 function formatPrompt(prompt) {
-  return prompt.replace("___", '<span class="blank">___</span>');
+  return escapeHTML(prompt).replace("___", '<span class="blank">___</span>');
 }
 
 function formatDuration(ms) {
@@ -1080,6 +1133,25 @@ function shuffle(list) {
 
 function normalizeRussian(text) {
   return text.trim().toLowerCase().replace(/ё/g, "е");
+}
+
+function escapeHTML(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function escapeAttribute(value) {
+  return escapeHTML(value).replaceAll("`", "&#96;");
+}
+
+function scrollCurrentNavIntoView() {
+  const current = document.querySelector(".page-nav-link.is-current");
+  if (!current) return;
+  current.scrollIntoView({ block: "nearest", inline: "center" });
 }
 
 // ─── Event Handlers ───────────────────────────────────────────
@@ -1124,11 +1196,14 @@ el.typingInput.addEventListener("keydown", (event) => {
 el.listenPlayBtn.addEventListener("click", () => {
   const item = currentItem();
   if (!item) return;
-  if (state.currentSolved) {
-    speakFullSentence(item);
-  } else {
-    speakWithBlank(item);
-  }
+  speakFullSentence(item);
+});
+
+el.listenClueBtn.addEventListener("click", () => {
+  state.listeningFallbackVisible = true;
+  saveState();
+  renderPrompt(getActivePhase());
+  render();
 });
 
 el.referenceMatrix.addEventListener("click", (event) => {
@@ -1144,14 +1219,19 @@ el.resetSessionButton.addEventListener("click", () => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.target.tagName === "INPUT" || event.target.tagName === "TEXTAREA") return;
+  if (
+    event.target instanceof Element &&
+    event.target.closest("input, textarea, button, a, select, summary, [contenteditable='true']")
+  ) {
+    return;
+  }
   const key = event.key;
   const phase = getActivePhase();
 
   if (key === " " && phase === "listening" && !state.currentSolved) {
     event.preventDefault();
     const item = currentItem();
-    if (item) speakWithBlank(item);
+    if (item) speakFullSentence(item);
     return;
   }
 
@@ -1183,9 +1263,11 @@ if (!currentItem() || !itemMatchesActivePhase(currentItem()) || !isValidOptionOr
   render();
 }
 
+requestAnimationFrame(scrollCurrentNavIntoView);
+
 if (typeof initSync === "function") {
   initSync("possessives", () => state, (serverState) => {
-    state = migrateState(serverState);
+    state = mergeState(serverState);
     saveState();
     render();
   });

@@ -27,6 +27,10 @@ body.possessives-page {
     linear-gradient(180deg, #fbf8f1 0%, #efe7d8 100%);
 }
 
+.possessives-page .is-hidden {
+  display: none !important;
+}
+
 .possessives-page .orb-a {
   background: rgba(79, 138, 58, 0.15);
 }
@@ -48,6 +52,27 @@ body.possessives-page {
 
 .step-nav::-webkit-scrollbar {
   display: none;
+}
+
+.scope-strip {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(79, 138, 58, 0.16);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(135deg, rgba(79, 138, 58, 0.12), rgba(255, 255, 255, 0.64)),
+    rgba(255, 255, 255, 0.48);
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.scope-strip strong {
+  color: var(--ink);
+  white-space: nowrap;
 }
 
 .step-btn {
@@ -185,6 +210,12 @@ body.possessives-page {
   grid-template-columns: minmax(82px, 0.8fr) repeat(4, minmax(120px, 1fr));
   gap: 10px;
   margin-top: 1.4rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.45rem;
 }
 
 .matrix-head,
@@ -218,6 +249,9 @@ body.possessives-page {
 }
 
 .matrix-cell {
+  appearance: none;
+  font: inherit;
+  text-align: left;
   position: relative;
   overflow: hidden;
   display: grid;
@@ -235,6 +269,11 @@ body.possessives-page {
 .matrix-cell:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(49, 37, 28, 0.1);
+}
+
+.matrix-cell:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--family-color) 70%, white);
+  outline-offset: 3px;
 }
 
 .matrix-cell:active {
@@ -390,6 +429,8 @@ body.possessives-page {
 
 .listening-controls {
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
   justify-content: center;
   padding: 0.5rem 0;
 }
@@ -418,6 +459,11 @@ body.possessives-page {
 
 .listen-play-btn:active {
   transform: translateY(1px) scale(0.98);
+}
+
+.listen-clue-btn {
+  min-height: 50px;
+  padding-inline: 1rem;
 }
 
 .play-icon {
@@ -564,20 +610,22 @@ body.possessives-page {
     flex-wrap: nowrap;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    scrollbar-width: thin;
     padding: 8px 10px;
     gap: 8px;
+    scroll-padding-inline: 10px;
   }
 
   .possessives-page .page-nav::-webkit-scrollbar {
-    display: none;
+    display: block;
+    height: 4px;
   }
 
   .possessives-page .page-nav-link {
     flex: 0 0 auto;
-    min-height: 38px;
-    padding: 0.58rem 0.82rem;
-    font-size: 0.84rem;
+    min-height: 36px;
+    padding: 0.52rem 0.76rem;
+    font-size: 0.8rem;
   }
 
   .possessives-page .app-shell {
@@ -608,6 +656,12 @@ body.possessives-page {
   .step-nav {
     gap: 5px;
     padding-bottom: 8px;
+    scrollbar-width: thin;
+  }
+
+  .step-nav::-webkit-scrollbar {
+    display: block;
+    height: 4px;
   }
 
   .step-btn {
@@ -627,6 +681,19 @@ body.possessives-page {
     padding: 0.4rem 0.55rem;
   }
 
+  .scope-strip {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.2rem;
+    margin-bottom: 0.75rem;
+    padding: 0.65rem 0.75rem;
+    font-size: 0.84rem;
+  }
+
+  .scope-strip strong {
+    white-space: normal;
+  }
+
   /* Metrics */
   .metrics-mini {
     gap: 6px;
@@ -638,7 +705,68 @@ body.possessives-page {
 
   /* Practice */
   .possessives-page .practice-panel {
-    padding: 14px;
+    padding: 12px;
+  }
+
+  .prompt-card {
+    gap: 0.65rem;
+    padding: 12px;
+  }
+
+  .prompt-toolbar {
+    min-height: 42px;
+  }
+
+  .translation-line {
+    margin-top: 0.45rem;
+  }
+
+  .prompt-chip-row {
+    gap: 6px;
+    margin-top: 0.65rem;
+  }
+
+  .prompt-chip {
+    min-height: 30px;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.8rem;
+  }
+
+  .prompt-label,
+  .sidebar-kicker {
+    margin-bottom: 0.35rem;
+  }
+
+  .possessives-page .prompt-text {
+    font-size: clamp(1.45rem, 8vw, 1.95rem);
+  }
+
+  .possessives-page .option-button {
+    min-height: 44px;
+    padding: 0.62rem 0.7rem;
+    border-radius: 14px;
+    font-size: 1.05rem;
+  }
+
+  .practice-options {
+    gap: 0.4rem;
+  }
+
+  .practice-options,
+  .typing-area {
+    order: 4;
+  }
+
+  .hint-row {
+    order: 5;
+  }
+
+  .feedback-card {
+    order: 6;
+  }
+
+  .action-row {
+    order: 7;
   }
 
   .possessives-page .practice-options-grid {
@@ -669,11 +797,12 @@ body.possessives-page {
 
   /* Reference matrix */
   .reference-matrix {
-    grid-template-columns: minmax(56px, 0.72fr) repeat(4, minmax(72px, 1fr));
+    grid-template-columns: 66px repeat(4, 88px);
     gap: 6px;
-    overflow-x: clip;
+    overflow-x: auto;
     max-width: 100%;
     padding-bottom: 4px;
+    scrollbar-width: thin;
   }
 
   .matrix-head,
@@ -688,7 +817,7 @@ body.possessives-page {
   }
 
   .matrix-panel {
-    overflow-x: clip;
+    overflow-x: hidden;
   }
 
   .matrix-word {

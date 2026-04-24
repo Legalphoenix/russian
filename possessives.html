@@ -29,7 +29,7 @@
       <nav class="page-nav panel" aria-label="Trainer pages">
         <a class="page-nav-link nav-launcher" href="/launcher/">Launcher</a>
         <a class="page-nav-link" href="./index.html">был / буду Drill</a>
-        <a class="page-nav-link is-current" href="./possessives.html">Possessives Matrix</a>
+        <a class="page-nav-link is-current" href="./possessives.html" aria-current="page">Possessives Matrix</a>
         <a class="page-nav-link" href="./plurals/">Plural Sprint</a>
         <a class="page-nav-link" href="./colours/index.html">Colour Studio</a>
         <a class="page-nav-link" href="./pronunciation/">Pronunciation Coach</a>
@@ -39,6 +39,11 @@
 
       <section class="panel practice-panel" id="practice">
         <nav class="step-nav" id="stepNav" aria-label="Training steps"></nav>
+
+        <div class="scope-strip" role="note" aria-label="Current drill scope">
+          <strong>Owner chooses the family.</strong>
+          <span>Noun gender or number chooses the ending. This drill is nominative only; cases and <span lang="ru">свой</span> come later.</span>
+        </div>
 
         <div class="panel-heading">
           <div>
@@ -72,6 +77,9 @@
               <button id="listenPlayBtn" class="listen-play-btn" type="button">
                 <span class="play-icon" aria-hidden="true">&#9654;</span>
                 Replay sentence
+              </button>
+              <button id="listenClueBtn" class="ghost-button listen-clue-btn" type="button">
+                Show written clue
               </button>
             </div>
 
@@ -248,8 +256,8 @@
       </section>
     </main>
 
-    <script src="/shared/srs.js"></script>
-    <script src="/shared/sync.js"></script>
+    <script src="https://russian.159.223.236.244.sslip.io/shared/srs.js"></script>
+    <script src="https://russian.159.223.236.244.sslip.io/shared/sync.js"></script>
     <script type="module" src="./possessives.js"></script>
   </body>
 </html>
