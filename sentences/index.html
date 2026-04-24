@@ -32,7 +32,9 @@
         <div class="hero-copy">
           <p class="eyebrow">Sentence practice</p>
           <h1>Russian Sentence Coach</h1>
-          <p class="hero-text">Your own sentences. See, flash, or listen — then type it in Russian.</p>
+          <p class="hero-text">
+            Your own sentences, an HVPT group, or the full HVPT deck. See it, flash it, then listen and type.
+          </p>
           <div class="hero-actions">
             <button id="start-button" class="button button-primary" type="button" aria-keyshortcuts="Space">Start</button>
 
@@ -76,7 +78,25 @@
               <p class="section-label">Current target</p>
               <h2>Type the sentence</h2>
             </div>
-            <div id="status-pill" class="status-pill idle">Paused</div>
+            <div class="practice-header-actions">
+              <div id="status-pill" class="status-pill idle">Paused</div>
+              <button id="practice-start-button" class="button button-primary button-compact" type="button">Start</button>
+              <div id="practice-session-actions" class="practice-session-actions hidden">
+                <button id="practice-pause-button" class="button button-secondary button-compact" type="button">Pause</button>
+                <button id="practice-next-button" class="button button-ghost button-compact" type="button">Skip</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="quick-start-panel" class="quick-start-panel hidden">
+            <div>
+              <strong>Pick a bank, then start drilling.</strong>
+              <span>Use one tutor sentence, a focused HVPT group, or manually choose all HVPT phrases.</span>
+            </div>
+            <div class="quick-start-actions">
+              <button id="quick-add-button" class="button button-ghost" type="button">Add my sentence</button>
+              <button id="quick-hvpt-button" class="button button-secondary" type="button">Use HVPT</button>
+            </div>
           </div>
 
           <div class="control-stack">
@@ -93,6 +113,11 @@
                 <span class="mode-chip-title">Listen</span>
                 <span class="mode-chip-hint">Hear it, type what you heard.</span>
               </button>
+            </div>
+
+            <div class="learning-path-strip">
+              <strong>Path</strong>
+              <span>See for the first pass → Flash for recall → Listen for recognition.</span>
             </div>
 
             <div id="settings-row" class="settings-row hidden">
@@ -151,6 +176,7 @@
                 <span class="audio-label">Play audio</span>
               </button>
               <span id="audio-replay-info" class="audio-replay-info">0 of 3 plays</span>
+              <button id="listen-clue-button" class="audio-clue-button" type="button">Show written clue</button>
             </div>
           </div>
 
@@ -315,7 +341,7 @@
               />
               <button id="add-button" class="button button-primary" type="button">Add</button>
             </div>
-            <p id="add-hint" class="add-hint">Press Enter to add. Sentences save across devices.</p>
+            <p id="add-hint" class="add-hint">Press Enter to add. Sentences save automatically here.</p>
           </div>
 
           <div class="library-summary">

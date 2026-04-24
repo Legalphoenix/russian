@@ -15,12 +15,28 @@ const DEFAULT_REPLAY_LIMIT = 3;
 const MAX_CUSTOM_SENTENCES = 1000;
 const MASTERED_AVERAGE_ACCURACY = 96;
 const MASTERED_MIN_ATTEMPTS = 3;
+const MIN_SPEED_MS = 1500;
+const MAX_DISPLAY_WPM = 80;
+const MIN_REVIEW_DELAY_MS = 2 * 60 * 1000;
+const SHORT_REVIEW_DELAY_MS = 15 * 60 * 1000;
+const MEDIUM_REVIEW_DELAY_MS = 4 * 60 * 60 * 1000;
+const LONG_REVIEW_DELAY_MS = 24 * 60 * 60 * 1000;
+const MASTERED_REVIEW_DELAY_MS = 3 * 24 * 60 * 60 * 1000;
 const MODE_ORDER = ["copy", "flash", "listen"];
 const SOURCE_ORDER = ["custom", "hvpt"];
 const NO_SPACE_BEFORE = new Set([",", ".", "!", "?", ";", ":"]);
 const STOPWORDS = new Set([
   "а","в","во","и","из","как","мне","мы","на","не","но","она","они","с","ты","у","я",
 ]);
+const GRAMMAR_TARGET_PATTERNS = [
+  /^(буду|будешь|будет|будем|будете|будут)$/u,
+  /^(был|была|было|были)$/u,
+  /^(есть|ем|ешь|ест|едим|едите|едят|ел|ела|ели)$/u,
+  /^(хочу|хочешь|хочет|хотим|хотите|хотят)$/u,
+  /^(могу|можешь|может|можем|можете|могут)$/u,
+  /^(должен|должна|должно|должны|надо|нужно)$/u,
+  /^(мой|моя|мое|мои|твой|твоя|твое|твои|его|ее|наш|наша|наше|наши|ваш|ваша|ваше|ваши|их)$/u,
+];
 
 const MODE_META = {
   copy: {
@@ -52,7 +68,14 @@ const elements = {
   recentTrend: document.getElementById("recent-trend"),
   recentTrendDetail: document.getElementById("recent-trend-detail"),
   statusPill: document.getElementById("status-pill"),
+  practiceStartButton: document.getElementById("practice-start-button"),
+  practiceSessionActions: document.getElementById("practice-session-actions"),
+  practicePauseButton: document.getElementById("practice-pause-button"),
+  practiceNextButton: document.getElementById("practice-next-button"),
   countdownPill: document.getElementById("countdown-pill"),
+  quickStartPanel: document.getElementById("quick-start-panel"),
+  quickAddButton: document.getElementById("quick-add-button"),
+  quickHvptButton: document.getElementById("quick-hvpt-button"),
   promptStage: document.getElementById("prompt-stage"),
   englishGloss: document.getElementById("english-gloss"),
   sentenceDisplay: document.getElementById("sentence-display"),
@@ -60,6 +83,7 @@ const elements = {
   audioStage: document.getElementById("audio-stage"),
   audioPlayButton: document.getElementById("audio-play"),
   audioReplayInfo: document.getElementById("audio-replay-info"),
+  listenClueButton: document.getElementById("listen-clue-button"),
   audioPlayer: document.getElementById("audio-player"),
   sentenceInput: document.getElementById("sentence-input"),
   liveTimer: document.getElementById("live-timer"),
@@ -147,7 +171,18 @@ function createAggregateStats() {
 }
 
 function createSentenceModeStats() {
-  return { attempts: 0, totalAccuracy: 0, totalWpm: 0, lastSeenAt: 0, bestAccuracy: 0 };
+  return {
+    attempts: 0,
+    totalAccuracy: 0,
+    totalWpm: 0,
+    lastSeenAt: 0,
+    bestAccuracy: 0,
+    correct: 0,
+    streak: 0,
+    wrong: 0,
+    nextDueAt: 0,
+    lastResult: "",
+  };
 }
 
 function createSentenceStats() {
@@ -275,6 +310,13 @@ function sanitizeSentenceStats(source) {
       modeTarget.totalWpm = Math.max(0, numberOr(modeSource.totalWpm, 0));
       modeTarget.lastSeenAt = Math.max(0, numberOr(modeSource.lastSeenAt, 0));
       modeTarget.bestAccuracy = clamp(numberOr(modeSource.bestAccuracy, 0), 0, 100);
+      modeTarget.correct = Math.max(0, numberOr(modeSource.correct, 0));
+      modeTarget.streak = Math.max(0, numberOr(modeSource.streak, 0));
+      modeTarget.wrong = Math.max(0, numberOr(modeSource.wrong, 0));
+      modeTarget.nextDueAt = Math.max(0, numberOr(modeSource.nextDueAt, 0));
+      modeTarget.lastResult = typeof modeSource.lastResult === "string"
+        ? modeSource.lastResult.slice(0, 40)
+        : "";
     }
   });
   // Fold legacy single/multi into flash.
@@ -287,6 +329,10 @@ function sanitizeSentenceStats(source) {
     flash.totalWpm += Math.max(0, numberOr(legacySource.totalWpm, 0));
     flash.lastSeenAt = Math.max(flash.lastSeenAt, numberOr(legacySource.lastSeenAt, 0));
     flash.bestAccuracy = Math.max(flash.bestAccuracy, clamp(numberOr(legacySource.bestAccuracy, 0), 0, 100));
+    flash.correct += Math.max(0, numberOr(legacySource.correct, 0));
+    flash.wrong += Math.max(0, numberOr(legacySource.wrong, 0));
+    flash.streak = Math.max(flash.streak, numberOr(legacySource.streak, 0));
+    flash.nextDueAt = Math.max(flash.nextDueAt, numberOr(legacySource.nextDueAt, 0));
   });
   return target;
 }
@@ -729,6 +775,7 @@ function pickHiddenIndexes(tokens, requestedCount) {
     .filter(({ token }) => token.isWord);
   if (!wordIndexes.length) return [];
   const safeCount = clamp(requestedCount, 1, Math.max(1, wordIndexes.length - 1));
+  const grammarTargets = wordIndexes.filter(({ token }) => isGrammarTargetToken(token));
   const primary = wordIndexes.filter(({ token }) => {
     const normalized = normalizeText(token.value);
     return token.value.length > 3 && !STOPWORDS.has(normalized);
@@ -736,7 +783,7 @@ function pickHiddenIndexes(tokens, requestedCount) {
   const secondary = wordIndexes.filter(({ token }) => token.value.length > 2);
   const tertiary = wordIndexes;
   const chosen = [];
-  [primary, secondary, tertiary].forEach((pool) => {
+  [grammarTargets, primary, secondary, tertiary].forEach((pool) => {
     const unused = pool.filter(({ index }) => !chosen.some((item) => item.index === index));
     pickRandomItems(unused, safeCount - chosen.length).forEach((item) => {
       if (chosen.length < safeCount) chosen.push(item);
@@ -769,12 +816,16 @@ function tickAttempt() {
     stopLiveInterval();
     return;
   }
-  if (currentAttempt.phase === "preview") {
+  if (currentAttempt.phase === "preview" && currentAttempt.mode === "flash") {
     currentAttempt.remainingPreviewMs = Math.max(0, currentAttempt.previewEndsAt - Date.now());
     if (currentAttempt.remainingPreviewMs === 0) {
       beginTypingPhase();
       return;
     }
+  } else if (currentAttempt.phase === "preview") {
+    stopLiveInterval();
+    renderPracticePanel();
+    return;
   }
   if (currentAttempt.phase !== "preview" && currentAttempt.phase !== "typing") {
     stopLiveInterval();
@@ -812,6 +863,90 @@ function formatStudyTime(ms) {
 
 function formatRepCount(attempts) {
   return `${attempts} rep${attempts === 1 ? "" : "s"}`;
+}
+
+function formatDueDistance(targetMs, now = Date.now()) {
+  const delta = Math.max(0, targetMs - now);
+  if (!delta) return "now";
+  const minutes = Math.ceil(delta / 60000);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.ceil(minutes / 60);
+  if (hours < 48) return `${hours}h`;
+  return `${Math.ceil(hours / 24)}d`;
+}
+
+function getReviewDelayMs(result, nextStreak) {
+  if (result.accuracy < 85) return MIN_REVIEW_DELAY_MS;
+  if (!result.clean) return SHORT_REVIEW_DELAY_MS;
+  if (nextStreak >= 3) return MASTERED_REVIEW_DELAY_MS;
+  if (nextStreak >= 2) return LONG_REVIEW_DELAY_MS;
+  return MEDIUM_REVIEW_DELAY_MS;
+}
+
+function getDueStatus(stats, now = Date.now()) {
+  if (!stats.attempts) return { label: "New", due: true, weight: 26 };
+  if (!stats.nextDueAt || stats.nextDueAt <= now) return { label: "Due now", due: true, weight: 18 };
+  return { label: `Due in ${formatDueDistance(stats.nextDueAt, now)}`, due: false, weight: 0.25 };
+}
+
+function isGrammarTargetToken(token) {
+  if (!token?.isWord) return false;
+  const normalized = normalizeText(token.value);
+  return GRAMMAR_TARGET_PATTERNS.some((pattern) => pattern.test(normalized));
+}
+
+function wordsOnly(text) {
+  return normalizeText(text).match(/[\p{L}\p{M}\p{N}-]+/gu) || [];
+}
+
+function firstWordMismatch(expectedText, typedText) {
+  const expected = wordsOnly(expectedText);
+  const typed = wordsOnly(typedText);
+  const length = Math.max(expected.length, typed.length);
+  for (let index = 0; index < length; index += 1) {
+    if (expected[index] !== typed[index]) {
+      return { expected: expected[index] || "", typed: typed[index] || "", index };
+    }
+  }
+  return null;
+}
+
+function endingLooksDifferent(expectedWord, typedWord) {
+  if (!expectedWord || !typedWord || expectedWord === typedWord) return false;
+  const prefixLength = Math.min(expectedWord.length, typedWord.length, 4);
+  if (prefixLength < 3) return false;
+  return expectedWord.slice(0, prefixLength - 1) === typedWord.slice(0, prefixLength - 1);
+}
+
+function buildResultDiagnostics(expectedText, typedText, result) {
+  const diagnostics = [];
+  if (/[A-Za-z]/.test(typedText)) {
+    diagnostics.push("Latin letters are present; switch to the Russian keyboard before judging the sentence.");
+  }
+
+  const expectedWords = wordsOnly(expectedText);
+  const typedWords = wordsOnly(typedText);
+  if (typedWords.length < expectedWords.length) {
+    diagnostics.push(`Missing ${expectedWords.length - typedWords.length} word${expectedWords.length - typedWords.length === 1 ? "" : "s"}.`);
+  } else if (typedWords.length > expectedWords.length) {
+    diagnostics.push(`Extra ${typedWords.length - expectedWords.length} word${typedWords.length - expectedWords.length === 1 ? "" : "s"}.`);
+  }
+
+  const mismatch = firstWordMismatch(expectedText, typedText);
+  if (mismatch && mismatch.expected && mismatch.typed) {
+    const endingNote = endingLooksDifferent(mismatch.expected, mismatch.typed)
+      ? " The stem is close, so check the ending."
+      : "";
+    diagnostics.push(`First mismatch: you typed "${mismatch.typed}"; correct is "${mismatch.expected}".${endingNote}`);
+  }
+
+  if (!diagnostics.length && result.clean) {
+    diagnostics.push("Clean enough. Move to the next phase or say it once aloud.");
+  } else if (!diagnostics.length) {
+    diagnostics.push("Compare the highlighted diff, then retry this same sentence once.");
+  }
+
+  return diagnostics.slice(0, 3);
 }
 
 function getAverageAccuracy(stats) {
@@ -901,16 +1036,22 @@ function pickSentence() {
 
   const mode = getMode();
   const lastKey = currentAttempt?.sentence?.key || "";
+  const now = Date.now();
   const ranked = pool.map((sentence) => {
     const stats = getSentenceStatsForView(sentence.key, mode);
     const avgAccuracy = getAverageAccuracy(stats);
     const avgWpm = getAverageWpm(stats);
-    const freshness = stats.lastSeenAt ? Math.min((Date.now() - stats.lastSeenAt) / 60000, 240) : 80;
+    const freshness = stats.lastSeenAt ? Math.min((now - stats.lastSeenAt) / 60000, 240) : 80;
+    const due = getDueStatus(stats, now);
     let weight =
+      due.weight +
       (stats.attempts ? 0 : 18) +
       (100 - avgAccuracy) * 0.7 +
       Math.max(0, 18 - avgWpm) * 0.8 +
       freshness * 0.08;
+    if (!due.due && pool.some((candidate) => getDueStatus(getSentenceStatsForView(candidate.key, mode), now).due)) {
+      weight *= 0.35;
+    }
     if (sentence.key === lastKey && pool.length > 1) weight *= 0.05;
     return { sentence, weight: Math.max(2, weight) };
   });
@@ -1023,6 +1164,13 @@ function speakSentence(sentence) {
   ensureSpeechVoice();
   if (speechVoice) utterance.voice = speechVoice;
   utterance.rate = 0.9;
+  utterance.onend = () => {
+    if (currentAttempt?.mode === "listen") {
+      currentAttempt.audioPlaying = false;
+      renderPracticePanel();
+    }
+  };
+  utterance.onerror = utterance.onend;
   try {
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
@@ -1036,10 +1184,23 @@ function triggerAttemptAudio() {
   if (!currentAttempt || currentAttempt.mode !== "listen") return;
   const limit = state.settings.replayLimit;
   if (currentAttempt.playCount >= limit) return;
+  const played = playSentenceAudio(currentAttempt.sentence);
+  if (!played) {
+    currentAttempt.listenClueVisible = true;
+    if (currentAttempt.phase === "preview") beginTypingPhase();
+    renderPracticePanel();
+    return;
+  }
   currentAttempt.playCount += 1;
   currentAttempt.audioPlaying = true;
-  playSentenceAudio(currentAttempt.sentence);
   if (currentAttempt.phase === "preview") beginTypingPhase();
+  renderPracticePanel();
+}
+
+function toggleListenClue() {
+  if (!currentAttempt || currentAttempt.mode !== "listen" || currentAttempt.phase === "review") return;
+  currentAttempt.listenClueVisible = !currentAttempt.listenClueVisible;
+  if (currentAttempt.listenClueVisible && currentAttempt.phase === "preview") beginTypingPhase();
   renderPracticePanel();
 }
 
@@ -1102,6 +1263,7 @@ function createAttempt({ sentence = null, hiddenIndexes = null, mode = getMode()
     result: null,
     playCount: 0,
     audioPlaying: false,
+    listenClueVisible: false,
   };
 
   elements.sentenceInput.value = "";
@@ -1114,12 +1276,7 @@ function createAttempt({ sentence = null, hiddenIndexes = null, mode = getMode()
     blurActiveElement();
   }
 
-  if (mode === "listen") {
-    // Auto-play the first time on a fresh listen attempt, then user can replay.
-    window.setTimeout(() => triggerAttemptAudio(), 120);
-  }
-
-  ensureLiveInterval();
+  if (mode !== "listen") ensureLiveInterval();
   render();
 }
 
@@ -1250,6 +1407,22 @@ function setSource(kind) {
   if (kind === "hvpt" && !hvpt.loaded && !hvpt.loading) void loadHvpt();
   prewarmActiveHvpt();
   render();
+}
+
+function jumpToCustomEntry() {
+  setSource("custom");
+  window.setTimeout(() => {
+    try { elements.addForm.scrollIntoView({ block: "center", behavior: "smooth" }); } catch { elements.addForm.scrollIntoView(); }
+    elements.addRussian.focus();
+  }, 80);
+}
+
+function jumpToHvptPicker() {
+  setSource("hvpt");
+  window.setTimeout(() => {
+    try { elements.hvptPicker.scrollIntoView({ block: "center", behavior: "smooth" }); } catch { elements.hvptPicker.scrollIntoView(); }
+    elements.hvptDeckSelect.focus();
+  }, 140);
 }
 
 function setOrderMode(order) {
@@ -1407,19 +1580,22 @@ function scoreAttempt() {
   const maxLength = Math.max(targetNormalized.length, typedNormalized.length, 1);
   const accuracy = ((maxLength - distance) / maxLength) * 100;
   const correctChars = Math.max(0, maxLength - distance);
-  const minutes = Math.max(currentAttempt.elapsedMs, 1) / 60000;
-  const wpm = correctChars ? (correctChars / 5) / minutes : 0;
+  const minutes = Math.max(currentAttempt.elapsedMs, MIN_SPEED_MS) / 60000;
+  const rawWpm = correctChars ? (correctChars / 5) / minutes : 0;
+  const wpm = Math.min(MAX_DISPLAY_WPM, rawWpm);
+  const finalErrors = Math.max(currentAttempt.errors, distance);
   const result = {
     sentenceKey: currentAttempt.sentence.key,
     mode: currentAttempt.mode,
     accuracy,
     wpm,
     timeMs: currentAttempt.elapsedMs,
-    errors: currentAttempt.errors,
+    errors: finalErrors,
     clean: accuracy >= CLEAN_THRESHOLD,
     at: Date.now(),
     typedText,
   };
+  result.diagnostics = buildResultDiagnostics(currentAttempt.sentence.text, typedText, result);
 
   currentAttempt.phase = "review";
   currentAttempt.result = result;
@@ -1475,6 +1651,15 @@ function applyResult(result) {
   sentenceModeStats.totalWpm += result.wpm;
   sentenceModeStats.lastSeenAt = result.at;
   sentenceModeStats.bestAccuracy = Math.max(sentenceModeStats.bestAccuracy, result.accuracy);
+  if (result.clean) {
+    sentenceModeStats.correct += 1;
+    sentenceModeStats.streak += 1;
+  } else {
+    sentenceModeStats.wrong += 1;
+    sentenceModeStats.streak = 0;
+  }
+  sentenceModeStats.nextDueAt = result.at + getReviewDelayMs(result, sentenceModeStats.streak);
+  sentenceModeStats.lastResult = result.clean ? "clean" : "retry";
 
   state.history.push({
     sentenceKey: result.sentenceKey,
@@ -1521,6 +1706,7 @@ function renderPracticePanel() {
   const hasInput = Boolean(elements.sentenceInput.value.trim());
   const isReview = attempt?.phase === "review";
   const pool = getActiveSentences();
+  elements.quickStartPanel.classList.toggle("hidden", pool.length > 0);
 
   elements.modeButtons.forEach((button) => {
     const isActive = button.dataset.mode === mode;
@@ -1546,6 +1732,7 @@ function renderPracticePanel() {
 
   const isListen = mode === "listen";
   elements.audioStage.classList.toggle("hidden", !isListen || !attempt || isReview);
+  elements.listenClueButton.classList.toggle("hidden", !isListen || !attempt || isReview);
 
   if (!attempt) {
     elements.statusPill.className = "status-pill idle";
@@ -1562,6 +1749,8 @@ function renderPracticePanel() {
     elements.sentenceDisplay.textContent = pool.length ? "Press Start to begin." : "—";
     elements.hiddenWordsRow.classList.add("hidden");
     elements.hiddenWordsRow.innerHTML = "";
+    elements.audioReplayInfo.textContent = `0 of ${replayLimit} plays`;
+    elements.listenClueButton.textContent = "Show written clue";
     elements.liveTimer.textContent = "0.0s";
     elements.attemptErrors.textContent = "0";
     elements.currentStreak.textContent = String(session.currentStreak);
@@ -1593,7 +1782,11 @@ function renderPracticePanel() {
   elements.promptStage.className = `prompt-stage ${statusClass}`;
   elements.promptStage.classList.toggle("hidden", isReview);
   elements.entryPanel.classList.toggle("hidden", isReview);
-  elements.englishGloss.textContent = attempt.sentence.english || "";
+  const showListenWritten = isListen && attempt.listenClueVisible && !isReview;
+  const showEnglish = !isListen || isReview || showListenWritten;
+  elements.englishGloss.textContent = showEnglish
+    ? attempt.sentence.english || ""
+    : "English hidden in Listen mode.";
 
   if (isListen) {
     elements.countdownPill.textContent = `${attempt.playCount} of ${replayLimit} plays`;
@@ -1601,15 +1794,17 @@ function renderPracticePanel() {
     elements.countdownPill.textContent = `${(attempt.remainingPreviewMs / 1000).toFixed(1)}s`;
   } else if (isTyping || isPaused) {
     elements.countdownPill.textContent =
-      mode === "copy" ? "Visible" : `${attempt.hiddenCount} blank${attempt.hiddenCount === 1 ? "" : "s"}`;
+      mode === "copy" ? "Visible" : `${attempt.hiddenCount} hidden word${attempt.hiddenCount === 1 ? "" : "s"}`;
   } else if (isReview) {
     elements.countdownPill.textContent = "Saved";
   }
 
   if (isListen && !isReview) {
-    elements.sentenceDisplay.innerHTML = attempt.audioPlaying
-      ? `<span class="listen-placeholder">Playing…</span>`
-      : `<span class="listen-placeholder">Tap play to hear the sentence.</span>`;
+    elements.sentenceDisplay.innerHTML = showListenWritten
+      ? renderSentenceHtml(attempt.tokens)
+      : attempt.audioPlaying
+        ? `<span class="listen-placeholder">Playing the full Russian sentence…</span>`
+        : `<span class="listen-placeholder">Tap play. No English or written Russian is shown until you ask for a clue.</span>`;
   } else if (isPreview) {
     elements.sentenceDisplay.innerHTML = renderSentenceHtml(attempt.tokens);
   } else if (isTyping || isPaused) {
@@ -1628,11 +1823,12 @@ function renderPracticePanel() {
     const reached = attempt.playCount >= replayLimit;
     elements.audioPlayButton.disabled = reached;
     elements.audioPlayButton.querySelector(".audio-label").textContent = attempt.playCount === 0
-      ? "Play audio"
+      ? "Play Russian"
       : reached
         ? "No replays left"
         : "Replay";
     elements.audioReplayInfo.textContent = `${attempt.playCount} of ${replayLimit} plays`;
+    elements.listenClueButton.textContent = attempt.listenClueVisible ? "Hide written clue" : "Show written clue";
   }
 
   if (attempt.hiddenIndexes.length && isReview) {
@@ -1649,10 +1845,12 @@ function renderPracticePanel() {
 
   let feedback;
   if (isPaused) feedback = "Paused.";
-  else if (isPreview) feedback = mode === "flash" ? "Memorize it." : "Get ready.";
+  else if (isPreview) feedback = mode === "flash" ? "Memorize it." : "Tap Play when you are ready.";
   else if (isTyping && mode === "copy") feedback = "Type what you see.";
   else if (isTyping && mode === "flash") feedback = "Type from memory.";
-  else if (isTyping && mode === "listen") feedback = "Type what you heard.";
+  else if (isTyping && mode === "listen") feedback = attempt.listenClueVisible
+    ? "Written clue is visible. Type it, then score."
+    : "Type what you heard.";
   else if (isReview) feedback = "Scored.";
   else feedback = MODE_META[mode].summary;
   elements.feedbackMessage.textContent = feedback;
@@ -1681,12 +1879,15 @@ function renderResultCard() {
       ? `Listen rep (${currentAttempt.playCount} play${currentAttempt.playCount === 1 ? "" : "s"}).`
       : hiddenWords
         ? `Hidden: ${hiddenWords}.`
-        : `${currentAttempt.hiddenCount} blank${currentAttempt.hiddenCount === 1 ? "" : "s"}.`;
+        : `${currentAttempt.hiddenCount} hidden word${currentAttempt.hiddenCount === 1 ? "" : "s"}.`;
 
   elements.resultCard.classList.add("is-review");
   elements.resultSummary.textContent = result.clean ? "Clean" : "Retry";
   elements.resultTitle.textContent = `${formatPercent(result.accuracy)} accuracy · ${formatWpm(result.wpm)}`;
-  elements.resultBody.textContent = `${result.clean ? "Clean hit." : "Another pass recommended."} ${modeNote}`;
+  const diagnosticText = Array.isArray(result.diagnostics) && result.diagnostics.length
+    ? ` ${result.diagnostics.join(" ")}`
+    : "";
+  elements.resultBody.textContent = `${result.clean ? "Clean hit." : "Another pass recommended."} ${modeNote}${diagnosticText}`;
   elements.resultMetrics.innerHTML = buildResultMetrics(result);
   elements.resultDiff.innerHTML = buildDiffHtml(currentAttempt.sentence.text, result.typedText);
 }
@@ -1715,18 +1916,21 @@ function renderSessionPanel() {
 function renderFocusPanel() {
   const mode = getMode();
   const pool = getActiveSentences();
+  const now = Date.now();
   const ranked = pool
     .map((sentence) => {
       const stats = getSentenceStatsForView(sentence.key, mode);
       const avgAccuracy = getAverageAccuracy(stats);
       const avgWpm = getAverageWpm(stats);
-      const freshness = stats.lastSeenAt ? Math.min((Date.now() - stats.lastSeenAt) / 60000, 240) : 120;
+      const freshness = stats.lastSeenAt ? Math.min((now - stats.lastSeenAt) / 60000, 240) : 120;
+      const due = getDueStatus(stats, now);
       const weight =
+        due.weight +
         (stats.attempts ? 0 : 24) +
         (100 - avgAccuracy) * 0.8 +
         Math.max(0, 16 - avgWpm) +
         freshness * 0.05;
-      return { sentence, stats, avgAccuracy, avgWpm, weight };
+      return { sentence, stats, avgAccuracy, avgWpm, due, weight };
     })
     .sort((left, right) => right.weight - left.weight)
     .slice(0, 4);
@@ -1737,9 +1941,9 @@ function renderFocusPanel() {
   }
 
   elements.focusSentences.innerHTML = ranked
-    .map(({ sentence, stats, avgAccuracy, avgWpm }) => {
+    .map(({ sentence, stats, avgAccuracy, avgWpm, due }) => {
       const meta = stats.attempts
-        ? `${formatPercent(avgAccuracy)} avg · ${formatWpm(avgWpm)}`
+        ? `${due.label} · ${formatPercent(avgAccuracy)} avg · streak ${stats.streak || 0}`
         : "New";
       return `
         <div class="focus-item">
@@ -1820,7 +2024,9 @@ function renderHvptPicker() {
 
   const active = getActiveSentences();
   elements.hvptStatus.textContent = active.length
-    ? `${active.length} phrase${active.length === 1 ? "" : "s"} ready.`
+    ? state.settings.hvptGroupId
+      ? `${active.length} phrase${active.length === 1 ? "" : "s"} in this group. Choose "All phrases" to include the full deck.`
+      : `All ${active.length} phrase${active.length === 1 ? "" : "s"} included. Switch Group only when you want a smaller set.`
     : "No phrases in this selection.";
 }
 
@@ -1848,6 +2054,7 @@ function renderLibrary() {
       const attempts = modeStats.attempts;
       const mastery = attempts ? getMasteryPercent(modeStats) : 0;
       const section = getSentenceSection(modeStats);
+      const due = getDueStatus(modeStats);
       const isCurrent = currentAttempt?.sentence?.key === sentence.key;
       const isQueued = queuedSentenceKey === sentence.key;
       const sectionLabel = attempts ? (section === "mastered" ? "Mastered" : "In progress") : "New";
@@ -1874,7 +2081,7 @@ function renderLibrary() {
             </div>
             <div class="row-meta">
               <span class="row-section is-${section}">${sectionLabel}</span>
-              <span>${attempts ? `${mastery}% · ${formatRepCount(attempts)}` : "Not started"}</span>
+              <span>${attempts ? `${mastery}% · ${formatRepCount(attempts)} · ${due.label}` : "Not started"}</span>
             </div>
           </div>
           <div class="sentence-row-actions">
@@ -1899,12 +2106,21 @@ function renderButtons() {
 
   elements.startButton.classList.toggle("hidden", !showStart);
   elements.startButton.disabled = !pool.length;
+  elements.practiceStartButton.classList.toggle("hidden", !showStart);
+  elements.practiceStartButton.disabled = !pool.length;
   elements.heroSessionActions.classList.toggle("hidden", !hasSession);
+  elements.practiceSessionActions.classList.toggle("hidden", !hasSession);
   elements.pauseButton.classList.toggle("hidden", !canPause);
+  elements.practicePauseButton.classList.toggle("hidden", !canPause);
   elements.startButton.textContent = isPaused ? "Resume" : "Start";
+  elements.practiceStartButton.textContent = isPaused ? "Resume" : "Start";
   elements.pauseButton.textContent = "Pause";
+  elements.practicePauseButton.textContent = "Pause";
   elements.nextButton.textContent = "Skip";
+  elements.practiceNextButton.textContent = "Skip";
   elements.pauseButton.disabled = !(phase === "preview" || phase === "typing");
+  elements.practicePauseButton.disabled = !(phase === "preview" || phase === "typing");
+  elements.practiceNextButton.disabled = !hasSession;
   elements.scoreButton.disabled = !(phase === "typing" && elements.sentenceInput.value.trim());
   elements.clearButton.disabled = !elements.sentenceInput.value.trim();
   elements.practiceActions.classList.toggle("is-hidden", isReview);
@@ -2039,9 +2255,14 @@ function handleListClick(event) {
 
 function attachEvents() {
   elements.startButton.addEventListener("click", startOrResume);
+  elements.practiceStartButton.addEventListener("click", startOrResume);
   elements.pauseButton.addEventListener("click", pauseAttempt);
+  elements.practicePauseButton.addEventListener("click", pauseAttempt);
   elements.nextButton.addEventListener("click", nextSentence);
+  elements.practiceNextButton.addEventListener("click", nextSentence);
   elements.resetButton.addEventListener("click", resetProgress);
+  elements.quickAddButton.addEventListener("click", jumpToCustomEntry);
+  elements.quickHvptButton.addEventListener("click", jumpToHvptPicker);
   elements.scoreButton.addEventListener("click", scoreAttempt);
   elements.clearButton.addEventListener("click", clearInput);
   elements.advanceButton.addEventListener("click", nextSentence);
@@ -2064,6 +2285,7 @@ function attachEvents() {
   elements.hvptDeckSelect.addEventListener("change", (event) => setHvptDeck(event.target.value));
   elements.hvptGroupSelect.addEventListener("change", (event) => setHvptGroup(event.target.value));
   elements.audioPlayButton.addEventListener("click", triggerAttemptAudio);
+  elements.listenClueButton.addEventListener("click", toggleListenClue);
   elements.audioPlayer.addEventListener("play", () => handleAudioPlayerEvent("play"));
   elements.audioPlayer.addEventListener("pause", () => handleAudioPlayerEvent("pause"));
   elements.audioPlayer.addEventListener("ended", () => handleAudioPlayerEvent("ended"));
@@ -2095,3 +2317,7 @@ updateKeyboardState();
 if (state.settings.sourceKind === "hvpt") void loadHvpt();
 render();
 void syncStateFromServer();
+window.setTimeout(() => {
+  const currentNav = document.querySelector(".page-nav-link.is-current");
+  try { currentNav?.scrollIntoView({ block: "nearest", inline: "center" }); } catch {}
+}, 80);
