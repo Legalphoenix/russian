@@ -10,6 +10,7 @@ first load.
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import logging
@@ -46,6 +47,9 @@ MAX_GROUP_NAME_LENGTH = 60
 MAX_BATCH_PHRASES = 200
 DEFAULT_DECK_NAME = "Russian"
 DEFAULT_MODEL = "gpt-4o-mini-tts-2025-12-15"
+DEFAULT_IMAGE_MODEL = "gpt-image-2"
+DEFAULT_IMAGE_SIZE = "1024x1024"
+DEFAULT_IMAGE_QUALITY = "medium"
 DEFAULT_SPEED = 1.0
 DEFAULT_VOICES = ("cedar", "marin", "ash", "verse")
 BUILT_IN_VOICES = (
@@ -64,6 +68,10 @@ BUILT_IN_VOICES = (
     "cedar",
 )
 VOICE_SET = frozenset(BUILT_IN_VOICES)
+IMAGE_QUALITIES = ("auto", "low", "medium", "high")
+IMAGE_QUALITY_SET = frozenset(IMAGE_QUALITIES)
+IMAGE_METADATA_KEYS = ("imageUrl", "imagePrompt", "imageQuality", "imageModel", "imageUpdatedAt")
+IMAGE_URL_RE = re.compile(r"^\./api/images/[A-Za-z0-9._-]+\.(png|jpg|jpeg|webp)$")
 LOG = logging.getLogger("hvpt_sync")
 
 DECK_ID_RE = re.compile(r"^[a-zA-Z0-9]+$")
@@ -123,7 +131,7 @@ def create_library(now_ms: int = 0) -> dict[str, Any]:
     return {
         "version": 2,
         "updatedAt": now_ms,
-        "decks": [create_deck(DEFAULT_DECK_NAME, now_ms)],
+        "decks": [create_deck(DEFAULT_DECK_NAME, now_ms, deck_id="default")],
     }
 
 
@@ -158,6 +166,37 @@ def validate_voice_list(value: Any) -> list[str]:
     return voices
 
 
+def validate_image_quality(value: Any, fallback: str = DEFAULT_IMAGE_QUALITY) -> str:
+    quality = normalize_text(value).lower() or fallback
+    if quality not in IMAGE_QUALITY_SET:
+        raise ValidationError(f"Image quality must be one of: {', '.join(IMAGE_QUALITIES)}.")
+    return quality
+
+
+def validate_image_metadata(payload: dict[str, Any]) -> dict[str, Any]:
+    image_url = normalize_text(payload.get("imageUrl"))
+    if not image_url:
+        return {}
+    if len(image_url) > 240 or not IMAGE_URL_RE.match(image_url):
+        raise ValidationError("Invalid image URL.")
+
+    image_prompt = normalize_text(payload.get("imagePrompt"))
+    if len(image_prompt) > 3000:
+        raise ValidationError("Image prompt is too long.")
+
+    image_quality = validate_image_quality(payload.get("imageQuality"), DEFAULT_IMAGE_QUALITY)
+    image_model = normalize_text(payload.get("imageModel")) or DEFAULT_IMAGE_MODEL
+    image_updated_at = max(0, int(number_or(payload.get("imageUpdatedAt"), current_time_ms())))
+
+    return {
+        "imageUrl": image_url,
+        "imagePrompt": image_prompt,
+        "imageQuality": image_quality,
+        "imageModel": image_model,
+        "imageUpdatedAt": image_updated_at,
+    }
+
+
 def validate_phrase_payload(
     payload: Any,
     *,
@@ -189,8 +228,9 @@ def validate_phrase_payload(
     recording_url = normalize_text(payload.get("recordingUrl"))
     now_ms = current_time_ms()
     created_at = existing_created_at if existing_created_at is not None else now_ms
+    image_metadata = validate_image_metadata(payload)
 
-    return {
+    result = {
         "id": phrase_id or uuid.uuid4().hex[:12],
         "title": title_for_phrase(text),
         "text": text,
@@ -202,6 +242,8 @@ def validate_phrase_payload(
         "createdAt": created_at,
         "updatedAt": now_ms,
     }
+    result.update(image_metadata)
+    return result
 
 
 def validate_deck_name(value: Any) -> str:
@@ -371,15 +413,23 @@ def sanitize_library(payload: Any, now_ms: int | None = None) -> dict[str, Any]:
 class PhraseStore:
     """Stores saved phrases and cached audio variants."""
 
-    def __init__(self, data_dir: str | Path, model: str = DEFAULT_MODEL):
+    def __init__(
+        self,
+        data_dir: str | Path,
+        model: str = DEFAULT_MODEL,
+        image_model: str = DEFAULT_IMAGE_MODEL,
+    ):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.audio_dir = self.data_dir / "audio"
         self.audio_dir.mkdir(parents=True, exist_ok=True)
+        self.image_dir = self.data_dir / "images"
+        self.image_dir.mkdir(parents=True, exist_ok=True)
         self.phrases_path = self.data_dir / "phrases.json"
         self.backups_dir = self.data_dir / "backups"
         self.backups_dir.mkdir(parents=True, exist_ok=True)
         self.model = model
+        self.image_model = normalize_text(image_model) or DEFAULT_IMAGE_MODEL
         self._lock = threading.Lock()
         self._client: OpenAI | None = None
 
@@ -392,14 +442,19 @@ class PhraseStore:
             "status": "ok",
             "dataDir": str(self.data_dir),
             "model": self.model,
+            "imageModel": self.image_model,
             "deckCount": len(library["decks"]),
             "phraseCount": total_phrases,
             "openaiInstalled": OpenAI is not None,
             "openaiConfigured": bool(normalize_text(os.environ.get("OPENAI_API_KEY"))),
             "ttsReady": self.is_tts_ready(),
+            "imageReady": self.is_image_ready(),
         }
 
     def is_tts_ready(self) -> bool:
+        return OpenAI is not None and bool(normalize_text(os.environ.get("OPENAI_API_KEY")))
+
+    def is_image_ready(self) -> bool:
         return OpenAI is not None and bool(normalize_text(os.environ.get("OPENAI_API_KEY")))
 
     def bootstrap(self) -> dict[str, Any]:
@@ -409,7 +464,11 @@ class PhraseStore:
             "defaultVoices": list(DEFAULT_VOICES),
             "defaultSpeed": DEFAULT_SPEED,
             "model": self.model,
+            "imageModel": self.image_model,
+            "imageQualities": list(IMAGE_QUALITIES),
+            "defaultImageQuality": DEFAULT_IMAGE_QUALITY,
             "ttsReady": self.is_tts_ready(),
+            "imageReady": self.is_image_ready(),
             "decks": library["decks"],
         }
 
@@ -476,6 +535,10 @@ class PhraseStore:
                 phrase_id=phrase_id,
                 existing_created_at=existing["createdAt"] if existing else None,
             )
+            if existing and not normalize_text(payload.get("imageUrl")) and existing.get("imageUrl"):
+                for key in IMAGE_METADATA_KEYS:
+                    if key in existing:
+                        saved[key] = existing[key]
             phrases = [item for item in deck["phrases"] if item["id"] != saved["id"]]
             phrases.append(saved)
             deck["phrases"] = sorted(phrases, key=lambda item: item["updatedAt"], reverse=True)
@@ -637,12 +700,62 @@ class PhraseStore:
             "sizeBytes": output_path.stat().st_size,
         }
 
+    # ───── image generation ─────
+
+    def generate_phrase_image(self, deck_id: str, phrase_id: str, payload: Any) -> dict[str, Any]:
+        if payload is None:
+            payload = {}
+        if not isinstance(payload, dict):
+            raise ValidationError("Image payload must be a JSON object.")
+
+        quality = validate_image_quality(payload.get("quality"), DEFAULT_IMAGE_QUALITY)
+        with self._lock:
+            library = self._read_library()
+            deck = self._find_deck(library, deck_id)
+            phrase = next((item for item in deck["phrases"] if item["id"] == phrase_id), None)
+            if phrase is None:
+                raise ValidationError("Phrase not found.")
+            phrase_snapshot = dict(phrase)
+
+        client = self._get_client()
+        image = self._ensure_image(client, phrase_snapshot, quality)
+
+        with self._lock:
+            library = self._read_library()
+            deck = self._find_deck(library, deck_id)
+            phrase = next((item for item in deck["phrases"] if item["id"] == phrase_id), None)
+            if phrase is None:
+                raise ValidationError("Phrase not found.")
+            now_ms = current_time_ms()
+            phrase.update(
+                {
+                    "imageUrl": image["url"],
+                    "imagePrompt": image["prompt"],
+                    "imageQuality": quality,
+                    "imageModel": self.image_model,
+                    "imageUpdatedAt": now_ms,
+                }
+            )
+            deck["updatedAt"] = now_ms
+            library["updatedAt"] = now_ms
+            self._write_library(library, create_backup=self.phrases_path.exists())
+            return {"phrase": phrase, "image": image}
+
     def audio_path_for_name(self, file_name: str) -> Path | None:
         candidate = normalize_text(file_name)
         if not candidate or "/" in candidate or "\\" in candidate:
             return None
         path = (self.audio_dir / candidate).resolve()
         if path.parent != self.audio_dir.resolve() or not path.exists():
+            return None
+        return path
+
+    def image_path_for_name(self, file_name: str) -> Path | None:
+        candidate = normalize_text(file_name)
+        if not candidate or "/" in candidate or "\\" in candidate:
+            return None
+        path = (self.image_dir / candidate).resolve()
+        if path.parent != self.image_dir.resolve() or not path.exists():
             return None
         return path
 
@@ -707,6 +820,65 @@ class PhraseStore:
             "sizeBytes": output_path.stat().st_size,
         }
 
+    def _ensure_image(self, client: OpenAI, phrase: dict[str, Any], quality: str) -> dict[str, Any]:
+        prompt = self._build_image_prompt(phrase)
+        payload = {
+            "model": self.image_model,
+            "text": phrase["text"],
+            "note": phrase.get("note", ""),
+            "prompt": prompt,
+            "quality": quality,
+            "size": DEFAULT_IMAGE_SIZE,
+        }
+        digest = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:24]
+        file_name = f"img-{digest}.png"
+        output_path = self.image_dir / file_name
+        cached = output_path.exists()
+
+        if not cached:
+            result = client.images.generate(
+                model=self.image_model,
+                prompt=prompt,
+                quality=quality,
+                size=DEFAULT_IMAGE_SIZE,
+            )
+            if not result.data:
+                raise RuntimeError("Image generation returned no images.")
+            first_image = result.data[0]
+            image_base64 = normalize_text(
+                first_image.get("b64_json") if isinstance(first_image, dict) else getattr(first_image, "b64_json", "")
+            )
+            if not image_base64:
+                raise RuntimeError("Image generation returned no base64 image data.")
+            content = base64.b64decode(image_base64)
+            self._write_image(output_path, content)
+
+        return {
+            "id": digest,
+            "model": self.image_model,
+            "quality": quality,
+            "size": DEFAULT_IMAGE_SIZE,
+            "cached": cached,
+            "prompt": prompt,
+            "url": f"./api/images/{file_name}",
+            "sizeBytes": output_path.stat().st_size,
+        }
+
+    def _build_image_prompt(self, phrase: dict[str, Any]) -> str:
+        note = normalize_text(phrase.get("note"))
+        note_line = f"\nEnglish meaning/note for disambiguation: {note}" if note else ""
+        return (
+            "Create a square educational illustration for an adult Russian language learner.\n"
+            "Purpose: help the learner connect this Russian sentence to a memorable visual scene, "
+            "without relying on text in the image.\n"
+            f"Russian sentence: {phrase['text']}{note_line}\n"
+            "Style: warm, naturalistic editorial illustration with clean shapes, clear lighting, "
+            "and one obvious action or situation. Keep the scene specific and literal enough for "
+            "sentence recall. If the sentence expresses absence or negation, make the missing item "
+            "visually clear through the scene composition. Do not include captions, subtitles, "
+            "speech bubbles, labels, UI, Russian text, or English text."
+        )
+
     def _write_audio(self, output_path: Path, content: bytes) -> None:
         with NamedTemporaryFile("wb", dir=self.audio_dir, prefix="audio.", suffix=".tmp", delete=False) as handle:
             handle.write(content)
@@ -716,6 +888,17 @@ class PhraseStore:
                 os.fsync(handle.fileno())
             except OSError:
                 LOG.warning("fsync failed for temporary audio file %s", handle_name)
+        Path(handle_name).replace(output_path)
+
+    def _write_image(self, output_path: Path, content: bytes) -> None:
+        with NamedTemporaryFile("wb", dir=self.image_dir, prefix="image.", suffix=".tmp", delete=False) as handle:
+            handle.write(content)
+            handle.flush()
+            handle_name = handle.name
+            try:
+                os.fsync(handle.fileno())
+            except OSError:
+                LOG.warning("fsync failed for temporary image file %s", handle_name)
         Path(handle_name).replace(output_path)
 
     def _read_library(self) -> dict[str, Any]:
@@ -810,6 +993,9 @@ class HvptRequestHandler(SimpleHTTPRequestHandler):
         if path.startswith("/audio/"):
             self._handle_audio(path.removeprefix("/audio/"))
             return
+        if path.startswith("/images/"):
+            self._handle_image(path.removeprefix("/images/"))
+            return
 
         super().do_GET()
 
@@ -845,6 +1031,12 @@ class HvptRequestHandler(SimpleHTTPRequestHandler):
                 payload = self._read_json_body()
                 phrase = self.server.store.save_phrase(match.group(1), payload)
                 self._write_json(HTTPStatus.CREATED, {"phrase": phrase})
+                return
+            match = re.match(r"^/decks/([a-zA-Z0-9]+)/phrases/([A-Za-z0-9]+)/image$", path)
+            if match:
+                payload = self._read_json_body()
+                response = self.server.store.generate_phrase_image(match.group(1), match.group(2), payload)
+                self._write_json(HTTPStatus.OK, response)
                 return
             match = re.match(r"^/decks/([a-zA-Z0-9]+)/phrases/batch$", path)
             if match:
@@ -973,6 +1165,27 @@ class HvptRequestHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(content)
 
+    def _handle_image(self, file_name: str) -> None:
+        path = self.server.store.image_path_for_name(file_name)
+        if path is None:
+            self._write_error(HTTPStatus.NOT_FOUND, "Image not found.")
+            return
+
+        content = path.read_bytes()
+        suffix = path.suffix.lower()
+        if suffix in {".jpg", ".jpeg"}:
+            content_type = "image/jpeg"
+        elif suffix == ".webp":
+            content_type = "image/webp"
+        else:
+            content_type = "image/png"
+        self.send_response(HTTPStatus.OK.value)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Cache-Control", "public, max-age=31536000, immutable")
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
+
     def _normalize_api_path(self, raw_path: str) -> str:
         for prefix in ("/index/hvpt/api", "/hvpt/api", "/api"):
             if raw_path == prefix:
@@ -1052,11 +1265,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=normalize_text(os.environ.get("OPENAI_TTS_MODEL")) or DEFAULT_MODEL,
         help=f"TTS model to use. Default: {DEFAULT_MODEL}",
     )
+    serve_parser.add_argument(
+        "--image-model",
+        default=normalize_text(os.environ.get("OPENAI_IMAGE_MODEL")) or DEFAULT_IMAGE_MODEL,
+        help=f"Image model to use. Default: {DEFAULT_IMAGE_MODEL}",
+    )
     return parser
 
 
 def serve(args: argparse.Namespace) -> int:
-    store = PhraseStore(args.data_dir, model=args.model)
+    store = PhraseStore(args.data_dir, model=args.model, image_model=args.image_model)
     server = HvptHTTPServer((args.host, args.port), store, args.static_root)
     LOG.info(
         "Serving HVPT Coach on http://%s:%s using %s",

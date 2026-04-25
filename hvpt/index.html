@@ -243,6 +243,22 @@
           </div>
         </div>
 
+        <div class="library-tool-row" aria-label="Library display and image controls">
+          <button id="translation-toggle-button" class="mini-button" type="button">Hide English</button>
+          <label class="image-quality-control" for="image-quality-select">
+            <span>Image quality</span>
+            <select id="image-quality-select" class="quality-select">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="auto">Auto</option>
+            </select>
+          </label>
+          <button id="image-generate-group-button" class="mini-button" type="button">Generate group images</button>
+          <button id="image-generate-selected-button" class="mini-button" type="button">Generate selected</button>
+          <button id="image-visibility-toggle-button" class="mini-button" type="button">Show all images</button>
+        </div>
+
         <div id="drill-status" class="drill-status"></div>
         <audio id="drill-audio" preload="auto" style="display:none"></audio>
         <audio id="preview-audio" preload="auto" style="display:none"></audio>

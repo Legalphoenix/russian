@@ -47,7 +47,8 @@ body {
 
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 
@@ -744,6 +745,27 @@ h3 {
   line-height: 1.42;
 }
 
+.library-image-frame {
+  margin: 12px 0 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.library-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+.library-image-frame figcaption {
+  padding: 7px 10px 8px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .library-meta {
   margin: 0.65rem 0 0.9rem;
   font-size: 0.88rem;
@@ -905,6 +927,46 @@ button:disabled {
   flex-direction: column;
   gap: 8px;
   margin-bottom: 12px;
+}
+
+.library-tool-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.image-quality-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 0.52rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.quality-select {
+  min-height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.quality-select:focus {
+  outline: 2px solid rgba(31, 108, 103, 0.22);
+  outline-offset: 2px;
 }
 
 .group-chips {
@@ -1288,6 +1350,12 @@ button:disabled {
 
   .variant-note {
     display: none;
+  }
+
+  .library-tool-row > .mini-button,
+  .image-quality-control {
+    flex: 1 1 142px;
+    justify-content: center;
   }
 }
 

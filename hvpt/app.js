@@ -1,7 +1,10 @@
 const API_BASE = "./api";
 const ACTIVE_DECK_KEY = "hvpt:activeDeckId";
 const ACTIVE_GROUP_KEY = "hvpt:activeGroup";
+const HIDE_TRANSLATIONS_KEY = "hvpt:hideTranslations";
+const IMAGE_QUALITY_KEY = "hvpt:imageQuality";
 const DEFAULT_PRESET_LABEL = "Stress contrast";
+const DEFAULT_IMAGE_QUALITY = "medium";
 
 const INSTRUCTION_PRESETS = [
   {
@@ -58,6 +61,15 @@ const state = {
   drillShuffle: false,
   drillWaitSeconds: 0,
   previewPhraseId: "",
+  hideTranslations: false,
+  imagesVisibleAll: false,
+  visibleImageIds: new Set(),
+  imageGeneratingIds: new Set(),
+  imageBatchActive: false,
+  imageReady: false,
+  imageQuality: DEFAULT_IMAGE_QUALITY,
+  imageQualities: ["auto", "low", "medium", "high"],
+  imageModel: "gpt-image-2",
 };
 
 const refs = {
@@ -112,6 +124,11 @@ const refs = {
   groupChips: document.getElementById("group-chips"),
   groupNewButton: document.getElementById("group-new-button"),
   groupManageButton: document.getElementById("group-manage-button"),
+  translationToggleButton: document.getElementById("translation-toggle-button"),
+  imageQualitySelect: document.getElementById("image-quality-select"),
+  imageGenerateGroupButton: document.getElementById("image-generate-group-button"),
+  imageGenerateSelectedButton: document.getElementById("image-generate-selected-button"),
+  imageVisibilityToggleButton: document.getElementById("image-visibility-toggle-button"),
   modalRoot: document.getElementById("modal-root"),
   modalTitle: document.getElementById("modal-title"),
   modalBody: document.getElementById("modal-body"),
@@ -147,6 +164,27 @@ function escapeHtml(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function persistBoolean(key, value) {
+  try {
+    window.localStorage.setItem(key, value ? "1" : "0");
+  } catch {}
+}
+
+function restoreBoolean(key, fallback = false) {
+  try {
+    const value = window.localStorage.getItem(key);
+    if (value === "1") return true;
+    if (value === "0") return false;
+  } catch {}
+  return fallback;
+}
+
+function persistImageQuality() {
+  try {
+    window.localStorage.setItem(IMAGE_QUALITY_KEY, state.imageQuality);
+  } catch {}
 }
 
 function shuffle(items) {
@@ -334,6 +372,46 @@ function syncComposerMeta() {
   refs.shuffleButton.disabled = !variantReady || state.isGenerating;
   refs.stopButton.disabled = !variantReady;
   if (refs.unloadPackButton) refs.unloadPackButton.disabled = !variantReady && !hasLoadedPhrase;
+}
+
+function syncLibraryControls() {
+  if (refs.translationToggleButton) {
+    refs.translationToggleButton.textContent = state.hideTranslations ? "Show English" : "Hide English";
+    refs.translationToggleButton.setAttribute("aria-pressed", String(state.hideTranslations));
+  }
+
+  if (refs.imageQualitySelect) {
+    refs.imageQualitySelect.value = state.imageQuality;
+    refs.imageQualitySelect.disabled = state.imageBatchActive;
+  }
+
+  const filtered = getFilteredPhrases();
+  const selected = getDrillPhrasesForCurrentView();
+  const generatedCount = filtered.filter((phrase) => phrase.imageUrl).length;
+  const canGenerate = state.imageReady && !state.imageBatchActive && filtered.length > 0;
+
+  if (refs.imageGenerateGroupButton) {
+    const activeGroup = getActiveGroups().find((g) => g.id === state.activeGroupId);
+    refs.imageGenerateGroupButton.textContent = activeGroup ? "Generate group images" : "Generate all images";
+    refs.imageGenerateGroupButton.disabled = !canGenerate;
+    refs.imageGenerateGroupButton.title = state.imageReady
+      ? "Generate images for every sentence in the current view"
+      : "OpenAI image generation is not configured on the server";
+  }
+
+  if (refs.imageGenerateSelectedButton) {
+    refs.imageGenerateSelectedButton.disabled = !state.imageReady || state.imageBatchActive || selected.length === 0;
+    refs.imageGenerateSelectedButton.textContent = `Generate selected${selected.length ? ` (${selected.length})` : ""}`;
+  }
+
+  if (refs.imageVisibilityToggleButton) {
+    refs.imageVisibilityToggleButton.textContent = state.imagesVisibleAll ? "Hide all images" : "Show all images";
+    refs.imageVisibilityToggleButton.disabled = generatedCount === 0;
+    refs.imageVisibilityToggleButton.setAttribute("aria-pressed", String(state.imagesVisibleAll));
+    refs.imageVisibilityToggleButton.title = generatedCount
+      ? `${generatedCount} generated image${generatedCount === 1 ? "" : "s"} in this view`
+      : "Generate images first";
+  }
 }
 
 function collectPhrasePayload({ allowMissingVoices = false } = {}) {
@@ -525,11 +603,13 @@ function renderLibrary() {
   if (!deckPhrases.length) {
     refs.libraryList.innerHTML = `<div class="empty-state">Save the phrases that still need ear work. They will stay on the server-backed phrase bank for later practice.</div>`;
     syncDrillUI();
+    syncLibraryControls();
     return;
   }
   if (!filteredPhrases.length) {
     refs.libraryList.innerHTML = `<div class="empty-state">No phrases in this group yet. Click the "+" on any phrase below to add it to a group.</div>`;
     syncDrillUI();
+    syncLibraryControls();
     return;
   }
 
@@ -555,8 +635,21 @@ function renderLibrary() {
       const isActive = phrase.id === state.loadedPhraseId;
       const isDrillPlaying = state.drillPlayingPhraseId === phrase.id;
       const isExcluded = inGroupView && state.drillExcluded.has(phrase.id);
-      const note = phrase.note ? `<p class="library-note">${escapeHtml(phrase.note)}</p>` : "";
-      const instructionNote = phrase.instructions ? "voice direction saved" : "plain delivery";
+      const note = phrase.note && !state.hideTranslations ? `<p class="library-note">${escapeHtml(phrase.note)}</p>` : "";
+      const isImageGenerating = state.imageGeneratingIds.has(phrase.id);
+      const hasImage = Boolean(phrase.imageUrl);
+      const imageVisible = hasImage && (state.imagesVisibleAll || state.visibleImageIds.has(phrase.id));
+      const imageBlock = hasImage && imageVisible
+        ? `<figure class="library-image-frame">
+             <img class="library-image" src="${escapeHtml(phrase.imageUrl)}" alt="AI illustration for: ${escapeHtml(phrase.text)}" loading="lazy" />
+             <figcaption>${escapeHtml(phrase.imageQuality || state.imageQuality)} · ${escapeHtml(phrase.imageModel || state.imageModel)}</figcaption>
+           </figure>`
+        : "";
+      const imageAction = isImageGenerating
+        ? `<button class="mini-button" type="button" disabled>Generating…</button>`
+        : hasImage
+          ? `<button class="mini-button" type="button" data-action="${imageVisible ? "hide-image" : "show-image"}" data-phrase-id="${escapeHtml(phrase.id)}">${imageVisible ? "Hide image" : "Show image"}</button>`
+          : `<button class="mini-button" type="button" data-action="generate-image" data-phrase-id="${escapeHtml(phrase.id)}" ${state.imageReady ? "" : "disabled"} title="${state.imageReady ? "Generate an image for this sentence" : "OpenAI image generation is not configured on the server"}">Generate image</button>`;
       const badges = deckGroups
         .filter((g) => g.phraseIds.includes(phrase.id))
         .map(
@@ -581,13 +674,14 @@ function renderLibrary() {
           </div>
           <p class="library-text">${escapeHtml(phrase.text)}</p>
           ${note}
-          <p class="library-meta">${formatSpeed(phrase.speed)} · ${instructionNote}</p>
+          ${imageBlock}
           <div class="library-groups">
             ${badges}
             <button class="group-badge group-badge-add" type="button" data-action="open-group-popover" data-phrase-id="${escapeHtml(phrase.id)}" title="Add to a group">+ Group</button>
           </div>
           <div class="library-actions">
             <button class="mini-button play-phrase-button ${state.previewPhraseId === phrase.id ? "is-playing" : ""}" type="button" data-action="preview" data-phrase-id="${escapeHtml(phrase.id)}" title="${state.previewPhraseId === phrase.id ? "Stop" : "Play this phrase"}" aria-label="${state.previewPhraseId === phrase.id ? "Stop preview" : "Play preview"}">${state.previewPhraseId === phrase.id ? "⏹" : "▶"}</button>
+            ${imageAction}
             <button class="mini-button" type="button" data-action="load" data-phrase-id="${escapeHtml(phrase.id)}">Load</button>
             <button class="mini-button is-danger" type="button" data-action="delete" data-phrase-id="${escapeHtml(phrase.id)}">Delete</button>
           </div>
@@ -596,6 +690,7 @@ function renderLibrary() {
     })
     .join("");
   syncDrillUI();
+  syncLibraryControls();
 }
 
 // ───── composer ─────
@@ -1263,6 +1358,77 @@ async function togglePhrasePreview(phraseId) {
   }
 }
 
+// ───── image generation ─────
+
+async function generateImageForPhrase(phraseId, { showAfter = true, announce = true } = {}) {
+  const deck = getActiveDeck();
+  if (!deck) return false;
+  const phrase = deck.phrases.find((p) => p.id === phraseId);
+  if (!phrase) return false;
+  if (!state.imageReady) {
+    if (announce) setNotice("warning", "OpenAI image generation is not configured on the server.");
+    return false;
+  }
+
+  state.imageGeneratingIds.add(phraseId);
+  renderLibrary();
+
+  try {
+    const response = await fetchJson(`${API_BASE}/decks/${deck.id}/phrases/${phraseId}/image`, {
+      method: "POST",
+      body: JSON.stringify({ quality: state.imageQuality }),
+    });
+    if (response.phrase) {
+      upsertPhrase(response.phrase);
+      if (showAfter) state.visibleImageIds.add(phraseId);
+    }
+    if (announce) setNotice("success", "Image ready.");
+    return true;
+  } catch (error) {
+    if (announce) setNotice("error", error.message);
+    return false;
+  } finally {
+    state.imageGeneratingIds.delete(phraseId);
+    renderLibrary();
+  }
+}
+
+async function generateImagesForPhrases(phrases, label) {
+  if (state.imageBatchActive) return;
+  const targets = phrases.filter(Boolean);
+  if (!targets.length) {
+    setNotice("warning", "No sentences selected for image generation.");
+    return;
+  }
+  if (!state.imageReady) {
+    setNotice("warning", "OpenAI image generation is not configured on the server.");
+    return;
+  }
+
+  state.imageBatchActive = true;
+  syncLibraryControls();
+  let succeeded = 0;
+  let failed = 0;
+
+  for (const [index, phrase] of targets.entries()) {
+    setNotice(
+      "info",
+      `Generating ${index + 1} of ${targets.length} ${label ? `for ${label}` : ""}: "${phrase.text.slice(0, 42)}${phrase.text.length > 42 ? "..." : ""}"`
+    );
+    const ok = await generateImageForPhrase(phrase.id, { showAfter: false, announce: false });
+    if (ok) succeeded += 1;
+    else failed += 1;
+  }
+
+  state.imageBatchActive = false;
+  renderLibrary();
+  if (failed) {
+    setNotice("warning", `Generated ${succeeded} image${succeeded === 1 ? "" : "s"}; ${failed} failed.`);
+  } else {
+    setNotice("success", `Generated ${succeeded} image${succeeded === 1 ? "" : "s"}. Use "Show all images" when you want to reveal them.`);
+  }
+}
+
 // ───── drill ─────
 
 function syncDrillUI() {
@@ -1890,6 +2056,14 @@ function bindEvents() {
     if (action === "load") loadPhrase(phraseId, { practice: true });
     else if (action === "preview") togglePhrasePreview(phraseId);
     else if (action === "delete") deletePhrase(phraseId);
+    else if (action === "generate-image") generateImageForPhrase(phraseId, { showAfter: true });
+    else if (action === "show-image") {
+      state.visibleImageIds.add(phraseId);
+      renderLibrary();
+    } else if (action === "hide-image") {
+      state.visibleImageIds.delete(phraseId);
+      renderLibrary();
+    }
     else if (action === "drill-select-all") {
       state.drillExcluded = new Set();
       renderLibrary();
@@ -2015,6 +2189,36 @@ function bindEvents() {
   refs.groupNewButton.addEventListener("click", () => createGroup());
   refs.groupManageButton.addEventListener("click", () => openManageGroupsModal());
 
+  refs.translationToggleButton.addEventListener("click", () => {
+    state.hideTranslations = !state.hideTranslations;
+    persistBoolean(HIDE_TRANSLATIONS_KEY, state.hideTranslations);
+    renderLibrary();
+  });
+
+  refs.imageQualitySelect.addEventListener("change", () => {
+    const nextQuality = refs.imageQualitySelect.value;
+    if (!state.imageQualities.includes(nextQuality)) return;
+    state.imageQuality = nextQuality;
+    persistImageQuality();
+    syncLibraryControls();
+  });
+
+  refs.imageGenerateGroupButton.addEventListener("click", () => {
+    const activeGroup = getActiveGroups().find((g) => g.id === state.activeGroupId);
+    const label = activeGroup ? activeGroup.name : "all phrases";
+    generateImagesForPhrases(getFilteredPhrases(), label);
+  });
+
+  refs.imageGenerateSelectedButton.addEventListener("click", () => {
+    generateImagesForPhrases(getDrillPhrasesForCurrentView(), "selected sentences");
+  });
+
+  refs.imageVisibilityToggleButton.addEventListener("click", () => {
+    state.imagesVisibleAll = !state.imagesVisibleAll;
+    if (!state.imagesVisibleAll) state.visibleImageIds.clear();
+    renderLibrary();
+  });
+
   // Modal dismiss.
   refs.modalRoot.addEventListener("click", (event) => {
     if (event.target.dataset.modalDismiss !== undefined) closeModal();
@@ -2034,6 +2238,17 @@ function restoreDeckSelection() {
   if (!state.activeDeckId && state.decks.length) state.activeDeckId = state.decks[0].id;
 }
 
+function restoreLibraryPreferences() {
+  state.hideTranslations = restoreBoolean(HIDE_TRANSLATIONS_KEY, false);
+  state.imagesVisibleAll = false;
+  state.visibleImageIds.clear();
+  try {
+    const savedQuality = window.localStorage.getItem(IMAGE_QUALITY_KEY);
+    if (savedQuality && state.imageQualities.includes(savedQuality)) state.imageQuality = savedQuality;
+  } catch {}
+  if (refs.imageQualitySelect) refs.imageQualitySelect.value = state.imageQuality;
+}
+
 async function init() {
   bindEvents();
   refs.stopButton.disabled = true;
@@ -2047,7 +2262,14 @@ async function init() {
     state.defaultVoices = bootstrap.defaultVoices || [];
     state.decks = bootstrap.decks || [];
     state.ttsReady = Boolean(bootstrap.ttsReady);
+    state.imageReady = Boolean(bootstrap.imageReady);
+    state.imageModel = bootstrap.imageModel || state.imageModel;
+    state.imageQualities = Array.isArray(bootstrap.imageQualities) && bootstrap.imageQualities.length
+      ? bootstrap.imageQualities
+      : state.imageQualities;
+    state.imageQuality = bootstrap.defaultImageQuality || state.imageQuality;
     restoreDeckSelection();
+    restoreLibraryPreferences();
 
     renderVoiceGrid();
     applyPreset(DEFAULT_PRESET_LABEL);
@@ -2070,6 +2292,7 @@ async function init() {
     state.availableVoices = ["cedar", "marin", "ash", "verse"];
     state.defaultVoices = ["cedar", "marin", "ash", "verse"];
     state.decks = [];
+    restoreLibraryPreferences();
     renderVoiceGrid();
     applyPreset(DEFAULT_PRESET_LABEL);
     renderLibrary();
