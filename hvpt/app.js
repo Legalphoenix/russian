@@ -642,7 +642,6 @@ function renderLibrary() {
       const imageBlock = hasImage && imageVisible
         ? `<figure class="library-image-frame">
              <img class="library-image" src="${escapeHtml(phrase.imageUrl)}" alt="AI illustration for: ${escapeHtml(phrase.text)}" loading="lazy" />
-             <figcaption>${escapeHtml(phrase.imageQuality || state.imageQuality)} · ${escapeHtml(phrase.imageModel || state.imageModel)}</figcaption>
            </figure>`
         : "";
       const imageAction = isImageGenerating

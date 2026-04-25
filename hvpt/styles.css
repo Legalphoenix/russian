@@ -760,12 +760,6 @@ h3 {
   object-fit: cover;
 }
 
-.library-image-frame figcaption {
-  padding: 7px 10px 8px;
-  color: var(--muted);
-  font-size: 0.78rem;
-}
-
 .library-meta {
   margin: 0.65rem 0 0.9rem;
   font-size: 0.88rem;
