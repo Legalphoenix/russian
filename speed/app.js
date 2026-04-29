@@ -80,6 +80,7 @@ const refs = {
   overallBest: document.getElementById("overall-best"),
   targetTitle: document.getElementById("target-title"),
   targetNote: document.getElementById("target-note"),
+  practicePanel: document.querySelector(".practice-panel"),
   randomButton: document.getElementById("random-button"),
   startButtons: Array.from(document.querySelectorAll("[data-start-mode]")),
   flowButtons: Array.from(document.querySelectorAll("[data-flow-mode]")),
@@ -857,6 +858,7 @@ function render() {
 
   refs.targetTitle.textContent = target.text;
   refs.targetNote.textContent = target.note || (target.kind === "word" ? "Custom word" : "Custom sentence");
+  refs.practicePanel.dataset.kind = target.kind;
   refs.answerInput.classList.toggle("is-word", target.kind === "word");
   refs.answerInput.rows = target.kind === "word" ? 1 : 2;
 
