@@ -2,8 +2,13 @@ const STORAGE_KEY = "russian-typing-speed-lab-state-v1";
 const GO_TRANSCRIBE_URL = "../hvpt/api/transcribe-go";
 const HISTORY_LIMIT = 100;
 const TARGET_HISTORY_LIMIT = 40;
-const GO_CLIP_MS = 1500;
-const GO_RETRY_MS = 260;
+const GO_START_RMS = 0.025;
+const GO_END_RMS = 0.014;
+const GO_NOISE_MULTIPLIER = 4;
+const GO_START_HOLD_MS = 120;
+const GO_END_SILENCE_MS = 420;
+const GO_MIN_RECORDING_MS = 360;
+const GO_MAX_RECORDING_MS = 2400;
 const AUTO_RESTART_MS = 120;
 
 const BUILT_IN_TARGETS = [
@@ -125,10 +130,22 @@ function createVoiceState() {
   return {
     armed: false,
     recording: false,
+    transcribing: false,
     stream: null,
+    audioContext: null,
+    source: null,
+    analyser: null,
+    sampleBuffer: null,
+    monitorFrame: 0,
     recorder: null,
     stopTimer: 0,
     chunks: [],
+    loudSince: 0,
+    silenceSince: 0,
+    recordingStartedAt: 0,
+    peakRms: 0,
+    currentRms: 0,
+    noiseFloor: 0.006,
     lastTranscript: "",
   };
 }
@@ -450,7 +467,7 @@ function finishAttempt() {
   if (state.startMode === "auto") {
     scheduleAutoStart();
   } else if (state.startMode === "voice" && voice.armed) {
-    window.setTimeout(listenForGo, GO_RETRY_MS);
+    listenForGo();
   } else {
     refs.timerStatus.textContent = "Ready";
     refs.timerCard.dataset.state = "idle";
@@ -537,9 +554,26 @@ async function armVoice() {
 }
 
 async function listenForGo() {
-  if (!voice.armed || attempt.running || state.startMode !== "voice" || voice.recording) return;
+  if (
+    !voice.armed ||
+    attempt.running ||
+    state.startMode !== "voice" ||
+    voice.recording ||
+    voice.transcribing ||
+    voice.monitorFrame
+  ) {
+    return;
+  }
   if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
     refs.voiceStatus.textContent = "Mic recording is not available in this browser.";
+    voice.armed = false;
+    renderControls();
+    return;
+  }
+
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    refs.voiceStatus.textContent = "Mic level detection is not available in this browser.";
     voice.armed = false;
     renderControls();
     return;
@@ -549,14 +583,76 @@ async function listenForGo() {
     if (!voice.stream) {
       voice.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     }
+
+    if (!voice.audioContext || voice.audioContext.state === "closed") {
+      voice.audioContext = new AudioContextClass();
+      voice.source = null;
+      voice.analyser = null;
+    }
+    if (voice.audioContext.state === "suspended") {
+      await voice.audioContext.resume();
+    }
+    if (!voice.analyser) {
+      voice.analyser = voice.audioContext.createAnalyser();
+      voice.analyser.fftSize = 1024;
+      voice.analyser.smoothingTimeConstant = 0.2;
+      voice.sampleBuffer = new Float32Array(voice.analyser.fftSize);
+      voice.source = voice.audioContext.createMediaStreamSource(voice.stream);
+      voice.source.connect(voice.analyser);
+    }
+
+    voice.loudSince = 0;
+    voice.silenceSince = 0;
+    refs.timerStatus.textContent = "Listening for GO";
+    refs.timerCard.dataset.state = "voice";
+    refs.voiceStatus.textContent = "Listening for speech...";
+    renderControls();
+    voice.monitorFrame = window.requestAnimationFrame(monitorForSpeech);
+  } catch (error) {
+    voice.armed = false;
+    refs.voiceStatus.textContent = micErrorMessage(error);
+    releaseVoiceStream();
+    renderControls();
+  }
+}
+
+function monitorForSpeech() {
+  voice.monitorFrame = 0;
+  if (!voice.armed || state.startMode !== "voice" || attempt.running || voice.recording || voice.transcribing) return;
+
+  const now = performance.now();
+  const rms = readMicRms();
+  const threshold = Math.max(GO_START_RMS, voice.noiseFloor * GO_NOISE_MULTIPLIER);
+
+  if (rms > threshold) {
+    if (!voice.loudSince) voice.loudSince = now;
+    if (now - voice.loudSince >= GO_START_HOLD_MS) {
+      beginGoRecording();
+      return;
+    }
+  } else {
+    voice.loudSince = 0;
+    voice.noiseFloor = voice.noiseFloor * 0.96 + rms * 0.04;
+  }
+
+  voice.monitorFrame = window.requestAnimationFrame(monitorForSpeech);
+}
+
+function beginGoRecording() {
+  if (!voice.armed || state.startMode !== "voice" || attempt.running || voice.recording || voice.transcribing) return;
+
+  try {
     const options = getRecorderOptions();
     const recorder = new MediaRecorder(voice.stream, options);
     voice.recorder = recorder;
     voice.chunks = [];
     voice.recording = true;
+    voice.recordingStartedAt = performance.now();
+    voice.silenceSince = 0;
+    voice.peakRms = voice.currentRms;
     refs.timerStatus.textContent = "Listening for GO";
     refs.timerCard.dataset.state = "voice";
-    refs.voiceStatus.textContent = "Listening...";
+    refs.voiceStatus.textContent = "Speech heard. Checking command...";
     renderControls();
 
     recorder.addEventListener("dataavailable", (event) => {
@@ -566,38 +662,87 @@ async function listenForGo() {
     recorder.addEventListener("stop", () => {
       const chunks = voice.chunks.slice();
       const mimeType = recorder.mimeType || options.mimeType || "audio/webm";
+      const durationMs = Math.max(0, performance.now() - voice.recordingStartedAt);
+      const peakRms = voice.peakRms;
       voice.recording = false;
       voice.recorder = null;
       clearTimeout(voice.stopTimer);
-      transcribeGoClip(chunks, mimeType);
+      voice.stopTimer = 0;
+      transcribeGoClip(chunks, mimeType, { durationMs, peakRms });
     }, { once: true });
 
     recorder.start();
-    voice.stopTimer = window.setTimeout(() => {
-      if (voice.recorder && voice.recorder.state !== "inactive") voice.recorder.stop();
-    }, GO_CLIP_MS);
+    voice.stopTimer = window.setTimeout(stopGoRecording, GO_MAX_RECORDING_MS);
+    voice.monitorFrame = window.requestAnimationFrame(monitorGoRecording);
   } catch (error) {
-    voice.armed = false;
+    voice.recording = false;
     refs.voiceStatus.textContent = micErrorMessage(error);
-    releaseVoiceStream();
-    renderControls();
+    voice.monitorFrame = window.requestAnimationFrame(monitorForSpeech);
   }
 }
 
-async function transcribeGoClip(chunks, mimeType) {
+function monitorGoRecording() {
+  voice.monitorFrame = 0;
+  if (!voice.recording || !voice.recorder) return;
+
+  const now = performance.now();
+  const rms = readMicRms();
+  voice.peakRms = Math.max(voice.peakRms, rms);
+
+  if (rms < GO_END_RMS) {
+    if (!voice.silenceSince) voice.silenceSince = now;
+    const longEnough = now - voice.recordingStartedAt >= GO_MIN_RECORDING_MS;
+    if (longEnough && now - voice.silenceSince >= GO_END_SILENCE_MS) {
+      stopGoRecording();
+      return;
+    }
+  } else {
+    voice.silenceSince = 0;
+  }
+
+  voice.monitorFrame = window.requestAnimationFrame(monitorGoRecording);
+}
+
+function stopGoRecording() {
+  clearTimeout(voice.stopTimer);
+  voice.stopTimer = 0;
+  if (voice.recorder && voice.recorder.state !== "inactive") {
+    voice.recording = false;
+    voice.recorder.stop();
+  }
+}
+
+function readMicRms() {
+  if (!voice.analyser || !voice.sampleBuffer) return 0;
+  voice.analyser.getFloatTimeDomainData(voice.sampleBuffer);
+  let sum = 0;
+  for (const sample of voice.sampleBuffer) {
+    sum += sample * sample;
+  }
+  const rms = Math.sqrt(sum / voice.sampleBuffer.length);
+  voice.currentRms = rms;
+  return rms;
+}
+
+async function transcribeGoClip(chunks, mimeType, metadata = {}) {
   if (!voice.armed || state.startMode !== "voice" || attempt.running) return;
   if (!chunks.length) {
-    refs.voiceStatus.textContent = "No audio captured.";
-    window.setTimeout(listenForGo, GO_RETRY_MS);
+    refs.voiceStatus.textContent = "No speech captured.";
+    listenForGo();
     return;
   }
 
+  voice.transcribing = true;
   refs.voiceStatus.textContent = "Transcribing...";
   try {
     const blob = new Blob(chunks, { type: mimeType });
     const response = await fetch(GO_TRANSCRIBE_URL, {
       method: "POST",
-      headers: { "Content-Type": blob.type || "audio/webm" },
+      headers: {
+        "Content-Type": blob.type || "audio/webm",
+        "X-Audio-Duration-Ms": String(Math.round(metadata.durationMs || 0)),
+        "X-Audio-Peak-Rms": String(Number(metadata.peakRms || 0).toFixed(4)),
+      },
       body: blob,
     });
     const payload = await response.json().catch(() => ({}));
@@ -611,19 +756,24 @@ async function transcribeGoClip(chunks, mimeType) {
       startAttempt("voice");
       return;
     }
-    refs.voiceStatus.textContent = voice.lastTranscript ? `Heard: ${voice.lastTranscript}` : "Listening...";
-    window.setTimeout(listenForGo, GO_RETRY_MS);
+    refs.voiceStatus.textContent = voice.lastTranscript
+      ? `Heard "${voice.lastTranscript}" - waiting for GO.`
+      : "Speech was not GO. Listening...";
   } catch (error) {
     refs.voiceStatus.textContent = transcriptionErrorMessage(error);
-    window.setTimeout(() => {
-      if (voice.armed && state.startMode === "voice" && !attempt.running) listenForGo();
-    }, 1200);
+  } finally {
+    voice.transcribing = false;
+    if (voice.armed && state.startMode === "voice" && !attempt.running) listenForGo();
   }
 }
 
 function disarmVoice(message) {
   voice.armed = false;
   clearTimeout(voice.stopTimer);
+  if (voice.monitorFrame) {
+    window.cancelAnimationFrame(voice.monitorFrame);
+    voice.monitorFrame = 0;
+  }
   if (voice.recorder && voice.recorder.state !== "inactive") {
     try {
       voice.recorder.stop();
@@ -632,15 +782,24 @@ function disarmVoice(message) {
     }
   }
   voice.recording = false;
+  voice.transcribing = false;
   voice.recorder = null;
   releaseVoiceStream();
   if (message) refs.voiceStatus.textContent = message;
 }
 
 function releaseVoiceStream() {
-  if (!voice.stream) return;
-  voice.stream.getTracks().forEach((track) => track.stop());
-  voice.stream = null;
+  if (voice.audioContext && voice.audioContext.state !== "closed") {
+    voice.audioContext.close().catch(() => {});
+  }
+  if (voice.stream) {
+    voice.stream.getTracks().forEach((track) => track.stop());
+    voice.stream = null;
+  }
+  voice.audioContext = null;
+  voice.source = null;
+  voice.analyser = null;
+  voice.sampleBuffer = null;
 }
 
 function getRecorderOptions() {

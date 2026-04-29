@@ -77,7 +77,8 @@ IMAGE_URL_RE = re.compile(r"^\./api/images/[A-Za-z0-9._-]+\.(png|jpg|jpeg|webp)$
 LOG = logging.getLogger("hvpt_sync")
 
 DECK_ID_RE = re.compile(r"^[a-zA-Z0-9]+$")
-GO_TOKEN_RE = re.compile(r"[a-zа-яё]+", re.IGNORECASE)
+GO_TOKEN_RE = re.compile(r"[a-zа-яё0-9]+", re.IGNORECASE)
+GO_COMMANDS = frozenset(("go", "го", "гоу"))
 GO_TRANSCRIBE_RATE_LIMIT = 45
 GO_TRANSCRIBE_RATE_WINDOW_SECONDS = 60
 
@@ -227,8 +228,14 @@ def transcription_extension_for_content_type(content_type: str) -> str:
 
 
 def contains_go_trigger(transcript: str) -> bool:
+    return normalize_go_command(transcript) in GO_COMMANDS
+
+
+def normalize_go_command(transcript: str) -> str:
     tokens = GO_TOKEN_RE.findall(transcript.casefold())
-    return "go" in tokens or "го" in tokens or "гоу" in tokens
+    if len(tokens) != 1:
+        return ""
+    return tokens[0]
 
 
 def validate_phrase_payload(
@@ -762,7 +769,7 @@ class PhraseStore:
                     model=self.transcription_model,
                     file=audio_file,
                     response_format="text",
-                    prompt='The speaker is trying to say the English start command "go".',
+                    language="en",
                 )
         finally:
             if temp_path is not None:
@@ -776,6 +783,7 @@ class PhraseStore:
         return {
             "transcript": transcript,
             "hasGo": contains_go_trigger(transcript),
+            "command": normalize_go_command(transcript),
             "model": self.transcription_model,
         }
 
