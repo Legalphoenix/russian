@@ -144,6 +144,7 @@ select {
 }
 
 .panel {
+  min-width: 0;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
@@ -402,6 +403,7 @@ select {
 }
 
 .practice-grid {
+  min-width: 0;
   display: grid;
   gap: 18px;
   margin-top: 1.5rem;
@@ -410,6 +412,7 @@ select {
 .prompt-card,
 .sidebar-card,
 .anchor-card {
+  min-width: 0;
   background: var(--panel-strong);
   border-radius: var(--radius-lg);
   border: 1px solid rgba(49, 37, 28, 0.08);
@@ -433,6 +436,7 @@ select {
   font-family: "Literata", serif;
   font-size: clamp(1.9rem, 5vw, 2.6rem);
   line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .inline-ru,
@@ -481,6 +485,7 @@ select {
 
 .sidebar-stack,
 .anchor-grid {
+  min-width: 0;
   display: grid;
   gap: 18px;
 }

@@ -308,6 +308,7 @@ fieldset {
 }
 
 .timer-card {
+  min-width: 0;
   min-height: 100%;
   display: grid;
   align-content: space-between;
@@ -334,15 +335,29 @@ fieldset {
 }
 
 .timer-line {
+  min-width: 0;
   align-items: flex-start;
   flex-direction: column;
   gap: 8px;
 }
 
 #live-timer {
-  font-size: clamp(2.9rem, 7vw, 5.2rem);
+  display: block;
+  max-width: 100%;
+  font-size: clamp(2.45rem, 4.6vw, 4.05rem);
   line-height: 1;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@supports (container-type: inline-size) {
+  .timer-card {
+    container-type: inline-size;
+  }
+
+  #live-timer {
+    font-size: clamp(2.45rem, 22cqw, 4.05rem);
+  }
 }
 
 .action-row {
