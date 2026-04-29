@@ -253,6 +253,12 @@
           <p>Copy full lines, then recall the missing words under time pressure.</p>
         </a>
 
+        <a class="card" href="/index/speed/">
+          <span class="label">Russian</span>
+          <h2>Typing Speed Lab</h2>
+          <p>Repeat words or sentences with auto-start, Enter, or OpenAI-transcribed GO.</p>
+        </a>
+
         <a class="card" href="/index/pronunciation/">
           <span class="label">Russian</span>
           <h2>Pronunciation Coach</h2>
@@ -328,6 +334,19 @@
           getProgress(state) {
             if (!state.totalAttempts) return null;
             return { answered: state.totalAttempts, accuracy: 0.5, label: `${state.totalAttempts} attempts` };
+          },
+        },
+        {
+          key: "russian-typing-speed-lab-state-v1",
+          href: "/index/speed/",
+          name: "Typing Speed Lab",
+          getProgress(state) {
+            const attempts = state.totals && Number(state.totals.attempts);
+            const totalMs = state.totals && Number(state.totals.totalMs);
+            if (!attempts || !totalMs) return null;
+            const averageMs = totalMs / attempts;
+            const label = `${attempts} reps · ${averageMs < 1000 ? Math.round(averageMs) + "ms" : (averageMs / 1000).toFixed(2) + "s"} avg`;
+            return { answered: attempts, accuracy: Math.min(1, 2000 / averageMs), label };
           },
         },
         {

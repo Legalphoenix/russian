@@ -36,6 +36,7 @@ except ImportError:  # pragma: no cover - environment dependent
 
 MAX_REQUEST_BYTES = 1024 * 1024
 MAX_RECORDING_BYTES = 10 * 1024 * 1024
+MAX_GO_RECORDING_BYTES = 1 * 1024 * 1024
 MAX_TEXT_LENGTH = 4096
 MAX_NOTE_LENGTH = 240
 MAX_INSTRUCTIONS_LENGTH = 1200
@@ -48,6 +49,7 @@ MAX_BATCH_PHRASES = 200
 DEFAULT_DECK_NAME = "Russian"
 DEFAULT_MODEL = "gpt-4o-mini-tts-2025-12-15"
 DEFAULT_IMAGE_MODEL = "gpt-image-2"
+DEFAULT_TRANSCRIPTION_MODEL = "gpt-4o-mini-transcribe"
 DEFAULT_IMAGE_SIZE = "1024x1024"
 DEFAULT_IMAGE_QUALITY = "medium"
 DEFAULT_SPEED = 1.0
@@ -75,6 +77,9 @@ IMAGE_URL_RE = re.compile(r"^\./api/images/[A-Za-z0-9._-]+\.(png|jpg|jpeg|webp)$
 LOG = logging.getLogger("hvpt_sync")
 
 DECK_ID_RE = re.compile(r"^[a-zA-Z0-9]+$")
+GO_TOKEN_RE = re.compile(r"[a-zа-яё]+", re.IGNORECASE)
+GO_TRANSCRIBE_RATE_LIMIT = 45
+GO_TRANSCRIBE_RATE_WINDOW_SECONDS = 60
 
 
 class ValidationError(ValueError):
@@ -195,6 +200,35 @@ def validate_image_metadata(payload: dict[str, Any]) -> dict[str, Any]:
         "imageModel": image_model,
         "imageUpdatedAt": image_updated_at,
     }
+
+
+def audio_extension_for_content_type(content_type: str) -> str:
+    normalized = normalize_text(content_type).lower()
+    if "ogg" in normalized:
+        return ".ogg"
+    if "wav" in normalized:
+        return ".wav"
+    if "mp4" in normalized or "m4a" in normalized or "aac" in normalized:
+        return ".m4a"
+    if "mpeg" in normalized or "mp3" in normalized:
+        return ".mp3"
+    return ".webm"
+
+
+def transcription_extension_for_content_type(content_type: str) -> str:
+    normalized = normalize_text(content_type).lower()
+    if "wav" in normalized:
+        return ".wav"
+    if "mp4" in normalized or "m4a" in normalized or "aac" in normalized:
+        return ".m4a"
+    if "mpeg" in normalized or "mp3" in normalized:
+        return ".mp3"
+    return ".webm"
+
+
+def contains_go_trigger(transcript: str) -> bool:
+    tokens = GO_TOKEN_RE.findall(transcript.casefold())
+    return "go" in tokens or "го" in tokens or "гоу" in tokens
 
 
 def validate_phrase_payload(
@@ -418,6 +452,7 @@ class PhraseStore:
         data_dir: str | Path,
         model: str = DEFAULT_MODEL,
         image_model: str = DEFAULT_IMAGE_MODEL,
+        transcription_model: str = DEFAULT_TRANSCRIPTION_MODEL,
     ):
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
@@ -430,6 +465,7 @@ class PhraseStore:
         self.backups_dir.mkdir(parents=True, exist_ok=True)
         self.model = model
         self.image_model = normalize_text(image_model) or DEFAULT_IMAGE_MODEL
+        self.transcription_model = normalize_text(transcription_model) or DEFAULT_TRANSCRIPTION_MODEL
         self._lock = threading.Lock()
         self._client: OpenAI | None = None
 
@@ -443,18 +479,23 @@ class PhraseStore:
             "dataDir": str(self.data_dir),
             "model": self.model,
             "imageModel": self.image_model,
+            "transcriptionModel": self.transcription_model,
             "deckCount": len(library["decks"]),
             "phraseCount": total_phrases,
             "openaiInstalled": OpenAI is not None,
             "openaiConfigured": bool(normalize_text(os.environ.get("OPENAI_API_KEY"))),
             "ttsReady": self.is_tts_ready(),
             "imageReady": self.is_image_ready(),
+            "transcriptionReady": self.is_transcription_ready(),
         }
 
     def is_tts_ready(self) -> bool:
         return OpenAI is not None and bool(normalize_text(os.environ.get("OPENAI_API_KEY")))
 
     def is_image_ready(self) -> bool:
+        return OpenAI is not None and bool(normalize_text(os.environ.get("OPENAI_API_KEY")))
+
+    def is_transcription_ready(self) -> bool:
         return OpenAI is not None and bool(normalize_text(os.environ.get("OPENAI_API_KEY")))
 
     def bootstrap(self) -> dict[str, Any]:
@@ -465,10 +506,12 @@ class PhraseStore:
             "defaultSpeed": DEFAULT_SPEED,
             "model": self.model,
             "imageModel": self.image_model,
+            "transcriptionModel": self.transcription_model,
             "imageQualities": list(IMAGE_QUALITIES),
             "defaultImageQuality": DEFAULT_IMAGE_QUALITY,
             "ttsReady": self.is_tts_ready(),
             "imageReady": self.is_image_ready(),
+            "transcriptionReady": self.is_transcription_ready(),
             "decks": library["decks"],
         }
 
@@ -698,6 +741,42 @@ class PhraseStore:
             "fileName": file_name,
             "url": f"./api/audio/{file_name}",
             "sizeBytes": output_path.stat().st_size,
+        }
+
+    def transcribe_go(self, content: bytes, extension: str = ".webm") -> dict[str, Any]:
+        """Transcribe a short clip and report whether it contains the GO trigger."""
+        if len(content) > MAX_GO_RECORDING_BYTES:
+            raise ValidationError(f"Recording too large (max {MAX_GO_RECORDING_BYTES // (1024 * 1024)}MB).")
+        if not content:
+            raise ValidationError("Recording is empty.")
+
+        client = self._get_client()
+        temp_path: Path | None = None
+        try:
+            with NamedTemporaryFile("wb", suffix=extension, delete=False) as handle:
+                handle.write(content)
+                temp_path = Path(handle.name)
+
+            with temp_path.open("rb") as audio_file:
+                response = client.audio.transcriptions.create(
+                    model=self.transcription_model,
+                    file=audio_file,
+                    response_format="text",
+                    prompt='The speaker is trying to say the English start command "go".',
+                )
+        finally:
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
+
+        if isinstance(response, str):
+            transcript = normalize_text(response)
+        else:
+            transcript = normalize_text(getattr(response, "text", ""))
+
+        return {
+            "transcript": transcript,
+            "hasGo": contains_go_trigger(transcript),
+            "model": self.transcription_model,
         }
 
     # ───── image generation ─────
@@ -952,6 +1031,8 @@ class HvptHTTPServer(ThreadingHTTPServer):
     ):
         self.store = store
         self.static_root = Path(static_root).resolve()
+        self.go_rate_lock = threading.Lock()
+        self.go_rate_by_client: dict[str, list[float]] = {}
         super().__init__(server_address, HvptRequestHandler)
 
 
@@ -1010,16 +1091,21 @@ class HvptRequestHandler(SimpleHTTPRequestHandler):
             if path == "/recording":
                 content = self._read_raw_body(MAX_RECORDING_BYTES)
                 content_type = normalize_text(self.headers.get("Content-Type"))
-                if "ogg" in content_type:
-                    ext = ".ogg"
-                elif "wav" in content_type:
-                    ext = ".wav"
-                elif "mp4" in content_type or "m4a" in content_type:
-                    ext = ".m4a"
-                else:
-                    ext = ".webm"
+                ext = audio_extension_for_content_type(content_type)
                 result = self.server.store.save_recording(content, extension=ext)
                 self._write_json(HTTPStatus.CREATED, result)
+                return
+            if path == "/transcribe-go":
+                if not self._allow_go_transcription():
+                    self._write_error(HTTPStatus.TOO_MANY_REQUESTS, "Too many GO transcription requests. Try again shortly.")
+                    return
+                content = self._read_raw_body(MAX_GO_RECORDING_BYTES)
+                content_type = normalize_text(self.headers.get("Content-Type"))
+                if not content_type.lower().startswith("audio/"):
+                    raise ValidationError("GO transcription requires an audio content type.")
+                ext = transcription_extension_for_content_type(content_type)
+                result = self.server.store.transcribe_go(content, extension=ext)
+                self._write_json(HTTPStatus.OK, result)
                 return
             if path == "/decks":
                 payload = self._read_json_body()
@@ -1194,6 +1280,30 @@ class HvptRequestHandler(SimpleHTTPRequestHandler):
                 return raw_path[len(prefix) :]
         return raw_path
 
+    def _allow_go_transcription(self) -> bool:
+        now = time.monotonic()
+        window_start = now - GO_TRANSCRIBE_RATE_WINDOW_SECONDS
+        client_key = self._client_rate_key()
+
+        with self.server.go_rate_lock:
+            recent = [
+                timestamp
+                for timestamp in self.server.go_rate_by_client.get(client_key, [])
+                if timestamp >= window_start
+            ]
+            if len(recent) >= GO_TRANSCRIBE_RATE_LIMIT:
+                self.server.go_rate_by_client[client_key] = recent
+                return False
+            recent.append(now)
+            self.server.go_rate_by_client[client_key] = recent
+        return True
+
+    def _client_rate_key(self) -> str:
+        forwarded_for = normalize_text(self.headers.get("X-Forwarded-For"))
+        if forwarded_for:
+            return forwarded_for.split(",", 1)[0].strip()
+        return self.client_address[0] if self.client_address else "unknown"
+
     def _read_json_body(self) -> Any:
         header = self.headers.get("Content-Length")
         if header is None:
@@ -1270,11 +1380,21 @@ def build_parser() -> argparse.ArgumentParser:
         default=normalize_text(os.environ.get("OPENAI_IMAGE_MODEL")) or DEFAULT_IMAGE_MODEL,
         help=f"Image model to use. Default: {DEFAULT_IMAGE_MODEL}",
     )
+    serve_parser.add_argument(
+        "--transcription-model",
+        default=normalize_text(os.environ.get("OPENAI_TRANSCRIPTION_MODEL")) or DEFAULT_TRANSCRIPTION_MODEL,
+        help=f"Speech-to-text model to use for GO detection. Default: {DEFAULT_TRANSCRIPTION_MODEL}",
+    )
     return parser
 
 
 def serve(args: argparse.Namespace) -> int:
-    store = PhraseStore(args.data_dir, model=args.model, image_model=args.image_model)
+    store = PhraseStore(
+        args.data_dir,
+        model=args.model,
+        image_model=args.image_model,
+        transcription_model=args.transcription_model,
+    )
     server = HvptHTTPServer((args.host, args.port), store, args.static_root)
     LOG.info(
         "Serving HVPT Coach on http://%s:%s using %s",

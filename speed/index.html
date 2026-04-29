@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="Russian typing speed practice for repeating words and sentences with auto-start, manual start, or OpenAI-transcribed GO."
+    />
+    <title>Russian Typing Speed Lab</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;700&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <nav class="page-nav panel" aria-label="Trainer pages">
+        <a class="page-nav-link nav-launcher" href="/launcher/">Launcher</a>
+        <a class="page-nav-link" href="../index.html">был / буду Drill</a>
+        <a class="page-nav-link" href="../possessives.html">Possessives Matrix</a>
+        <a class="page-nav-link" href="../plurals/">Plural Sprint</a>
+        <a class="page-nav-link" href="../colours/index.html">Colour Studio</a>
+        <a class="page-nav-link" href="../pronunciation/">Pronunciation Coach</a>
+        <a class="page-nav-link" href="../sentences/index.html">Sentence Coach</a>
+        <a class="page-nav-link is-current" href="./index.html" aria-current="page">Typing Speed Lab</a>
+        <a class="page-nav-link" href="../hvpt/">HVPT Voice Lab</a>
+      </nav>
+
+      <header class="topline panel">
+        <div>
+          <p class="eyebrow">Typing speed</p>
+          <h1>Russian Typing Speed Lab</h1>
+        </div>
+        <div class="topline-metrics" aria-label="Lifetime speed statistics">
+          <div>
+            <span>Total reps</span>
+            <strong id="total-attempts">0</strong>
+          </div>
+          <div>
+            <span>Average</span>
+            <strong id="overall-average">--</strong>
+          </div>
+          <div>
+            <span>Best</span>
+            <strong id="overall-best">--</strong>
+          </div>
+        </div>
+      </header>
+
+      <section class="workspace-grid">
+        <article class="practice-panel panel">
+          <div class="practice-head">
+            <div>
+              <p class="section-label">Current target</p>
+              <h2 id="target-title">был</h2>
+              <p id="target-note" class="target-note">was, masculine</p>
+            </div>
+            <button id="random-button" class="ghost-button" type="button">Random</button>
+          </div>
+
+          <div class="mode-grid" aria-label="Timer settings">
+            <fieldset class="control-group">
+              <legend>Start</legend>
+              <div class="segmented" role="radiogroup" aria-label="Start mode">
+                <button class="segment" type="button" data-start-mode="auto" aria-pressed="false">Auto</button>
+                <button class="segment" type="button" data-start-mode="manual" aria-pressed="true">Manual</button>
+                <button class="segment" type="button" data-start-mode="voice" aria-pressed="false">GO</button>
+              </div>
+            </fieldset>
+
+            <fieldset class="control-group">
+              <legend>After finish</legend>
+              <div class="segmented" role="radiogroup" aria-label="After finish mode">
+                <button class="segment" type="button" data-flow-mode="same" aria-pressed="true">Same</button>
+                <button class="segment" type="button" data-flow-mode="random" aria-pressed="false">Random</button>
+              </div>
+            </fieldset>
+          </div>
+
+          <div class="timer-card" data-state="idle">
+            <div class="timer-line">
+              <span id="timer-status" class="timer-status">Ready</span>
+              <strong id="live-timer">0.00s</strong>
+            </div>
+            <div class="action-row">
+              <button id="start-button" class="primary-button" type="button">Start</button>
+              <button id="voice-button" class="primary-button hidden" type="button">Listen for GO</button>
+              <button id="stop-button" class="ghost-button" type="button">Stop</button>
+            </div>
+            <p id="voice-status" class="voice-status" aria-live="polite"></p>
+          </div>
+
+          <label class="input-label" for="answer-input">Type here</label>
+          <textarea
+            id="answer-input"
+            class="answer-input"
+            rows="2"
+            lang="ru"
+            spellcheck="false"
+            autocapitalize="off"
+            autocomplete="off"
+            autocorrect="off"
+            placeholder="Waiting to start."
+          ></textarea>
+
+          <div id="last-result" class="last-result" aria-live="polite">
+            <span>Last</span>
+            <strong>--</strong>
+          </div>
+        </article>
+
+        <aside class="stats-panel panel">
+          <div class="stats-head">
+            <p class="section-label">This target</p>
+            <button id="reset-target-button" class="text-button" type="button">Reset</button>
+          </div>
+          <div class="stat-stack">
+            <div>
+              <span>Attempts</span>
+              <strong id="target-attempts">0</strong>
+            </div>
+            <div>
+              <span>Average</span>
+              <strong id="target-average">--</strong>
+            </div>
+            <div>
+              <span>Best</span>
+              <strong id="target-best">--</strong>
+            </div>
+            <div>
+              <span>Characters/min</span>
+              <strong id="target-cpm">--</strong>
+            </div>
+          </div>
+          <ol id="target-history" class="history-list" aria-label="Target attempt history"></ol>
+        </aside>
+      </section>
+
+      <section class="library-panel panel">
+        <div class="section-head">
+          <div>
+            <p class="section-label">Practice bank</p>
+            <h2>Choose a word or sentence</h2>
+          </div>
+          <div class="library-tabs" role="radiogroup" aria-label="Library type">
+            <button class="tab-button" type="button" data-library-kind="word" aria-pressed="true">Words</button>
+            <button class="tab-button" type="button" data-library-kind="sentence" aria-pressed="false">Sentences</button>
+          </div>
+        </div>
+
+        <form id="add-form" class="add-form">
+          <div class="field-row">
+            <label>
+              <span>Type</span>
+              <select id="add-kind">
+                <option value="word">Word</option>
+                <option value="sentence">Sentence</option>
+              </select>
+            </label>
+            <label class="target-field">
+              <span>Text</span>
+              <input id="add-text" type="text" lang="ru" autocomplete="off" />
+            </label>
+            <label class="note-field">
+              <span>Note</span>
+              <input id="add-note" type="text" autocomplete="off" />
+            </label>
+            <button class="primary-button add-button" type="submit">Add</button>
+          </div>
+        </form>
+
+        <div id="target-list" class="target-list" aria-label="Practice targets"></div>
+      </section>
+
+      <section class="history-panel panel">
+        <div class="section-head">
+          <div>
+            <p class="section-label">Recent timings</p>
+            <h2>History</h2>
+          </div>
+          <button id="reset-all-button" class="text-button" type="button">Reset all</button>
+        </div>
+        <div id="overall-history" class="overall-history"></div>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

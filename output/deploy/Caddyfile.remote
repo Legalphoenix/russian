@@ -147,6 +147,12 @@ russian-hub.159.223.236.244.sslip.io index.macchiatolabs.ai {
 		file_server
 	}
 
+	handle /index/speed* {
+		uri strip_prefix /index
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
 	handle /index/hvpt* {
 		uri strip_prefix /index
 		root * /srv/russian.159.223.236.244.sslip.io
@@ -237,6 +243,12 @@ macchiatolabs.ai {
 	}
 
 	handle /index/pronunciation* {
+		uri strip_prefix /index
+		root * /srv/russian.159.223.236.244.sslip.io
+		file_server
+	}
+
+	handle /index/speed* {
 		uri strip_prefix /index
 		root * /srv/russian.159.223.236.244.sslip.io
 		file_server
