@@ -303,9 +303,7 @@ function wireEvents() {
 
   refs.flowButtons.forEach((button) => {
     button.addEventListener("click", () => {
-      state.flowMode = button.dataset.flowMode === "random" ? "random" : "same";
-      saveState();
-      render();
+      setFlowMode(button.dataset.flowMode);
     });
   });
 
@@ -318,8 +316,10 @@ function wireEvents() {
   });
 
   refs.randomButton.addEventListener("click", () => {
-    selectRandomTarget(state.libraryKind);
-    if (state.startMode === "auto" && !attempt.running) scheduleAutoStart();
+    selectRandomTarget(state.libraryKind, {
+      lockRepeat: true,
+      restartIfRunning: true,
+    });
   });
 
   refs.startButton.addEventListener("click", () => {
@@ -348,7 +348,10 @@ function wireEvents() {
   refs.targetList.addEventListener("click", (event) => {
     const row = event.target.closest("[data-target-id]");
     if (!row) return;
-    selectTarget(row.dataset.targetId);
+    selectTarget(row.dataset.targetId, {
+      lockRepeat: true,
+      restartIfRunning: true,
+    });
   });
 
   refs.resetTargetButton.addEventListener("click", () => {
@@ -377,6 +380,13 @@ function setStartMode(mode) {
   saveState();
   renderControls();
   syncStartMode();
+}
+
+function setFlowMode(mode, options = {}) {
+  const nextMode = mode === "random" ? "random" : "same";
+  state.flowMode = nextMode;
+  if (options.save !== false) saveState();
+  render();
 }
 
 function syncStartMode() {
@@ -522,17 +532,25 @@ function normalizeForMatch(value) {
     .trim();
 }
 
-function selectTarget(targetId) {
+function selectTarget(targetId, options = {}) {
   const target = findTarget(targetId);
   if (!target) return;
+  const wasRunning = attempt.running;
+  const startedBy = refs.answerInput.dataset.startedBy || state.startMode;
   clearTimeout(autoTimer);
-  stopAttempt("Ready");
+  if (wasRunning || options.lockRepeat) stopAttempt("Ready");
   state.selectedId = target.id;
   state.libraryKind = target.kind;
+  if (options.lockRepeat) state.flowMode = "same";
   saveState();
   render();
-  if (state.startMode === "auto") scheduleAutoStart();
-  if (state.startMode === "voice" && voice.armed) listenForGo();
+  if (wasRunning && options.restartIfRunning) {
+    startAttempt(startedBy);
+  } else if (state.startMode === "auto") {
+    scheduleAutoStart();
+  } else if (state.startMode === "voice" && voice.armed) {
+    listenForGo();
+  }
 }
 
 function selectRandomTarget(kind, options = {}) {
@@ -541,10 +559,21 @@ function selectRandomTarget(kind, options = {}) {
   const selected = getSelectedTarget();
   const pool = targets.length > 1 ? targets.filter((target) => target.id !== selected.id) : targets;
   const next = pool[Math.floor(Math.random() * pool.length)];
+  const wasRunning = attempt.running;
+  const startedBy = refs.answerInput.dataset.startedBy || state.startMode;
+  if ((wasRunning && options.restartIfRunning) || options.lockRepeat) stopAttempt("Ready");
   state.selectedId = next.id;
   state.libraryKind = next.kind;
+  if (options.lockRepeat) state.flowMode = "same";
   if (options.save !== false) saveState();
   render();
+  if (wasRunning && options.restartIfRunning) {
+    startAttempt(startedBy);
+  } else if (state.startMode === "auto" && !attempt.running) {
+    scheduleAutoStart();
+  } else if (state.startMode === "voice" && voice.armed && !attempt.running) {
+    listenForGo();
+  }
 }
 
 async function armVoice() {
@@ -839,6 +868,7 @@ function handleAddTarget(event) {
   state.customTargets.push(target);
   state.selectedId = target.id;
   state.libraryKind = target.kind;
+  state.flowMode = "same";
   refs.addText.value = "";
   refs.addNote.value = "";
   refs.addKind.value = kind;
@@ -881,9 +911,11 @@ function renderControls() {
   });
 
   refs.startButton.classList.toggle("hidden", state.startMode !== "manual");
+  refs.startButton.disabled = attempt.running;
   refs.voiceButton.classList.toggle("hidden", state.startMode !== "voice");
   refs.voiceButton.textContent = voice.armed ? "Stop GO listener" : "Listen for GO";
   refs.voiceButton.disabled = attempt.running;
+  refs.stopButton.disabled = !attempt.running;
 
   if (attempt.running) {
     refs.timerCard.dataset.state = "running";

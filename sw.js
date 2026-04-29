@@ -6,7 +6,7 @@
  * localStorage-backed trainers.
  */
 
-const CACHE_NAME = "russian-trainers-v3";
+const CACHE_NAME = "russian-trainers-v4";
 
 const STATIC_ASSETS = [
   "/launcher/",

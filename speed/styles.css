@@ -233,7 +233,9 @@ h2 {
 .hero-target {
   min-height: 190px;
   display: grid;
-  align-content: center;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-content: stretch;
+  gap: 8px;
   padding: clamp(18px, 4vw, 30px);
   border-radius: var(--radius-lg);
   border: 1px solid rgba(35, 118, 93, 0.22);
@@ -242,12 +244,31 @@ h2 {
     #ffffff;
 }
 
+.target-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.target-head .section-label {
+  margin-bottom: 0;
+}
+
+.target-swap-button {
+  min-height: 40px;
+  padding: 0.52rem 0.72rem;
+  white-space: nowrap;
+}
+
 .hero-target h2 {
+  align-self: center;
   max-width: 100%;
   color: var(--ink);
-  font-size: clamp(3.8rem, 7vw, 6.4rem);
-  line-height: 0.9;
-  overflow-wrap: anywhere;
+  font-size: clamp(3.35rem, 6vw, 5.45rem);
+  line-height: 1;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .practice-panel[data-kind="sentence"] .hero-target {
@@ -669,8 +690,12 @@ input {
     padding: 18px;
   }
 
+  .hero-target .target-swap-button {
+    width: auto;
+  }
+
   .hero-target h2 {
-    font-size: clamp(3.25rem, 16vw, 4.9rem);
+    font-size: clamp(3.05rem, 15vw, 4.6rem);
   }
 
   .practice-panel[data-kind="sentence"] .hero-target h2 {

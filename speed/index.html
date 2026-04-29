@@ -57,7 +57,10 @@
           <div class="drill-stage">
             <div class="target-entry">
               <section class="hero-target" aria-labelledby="target-title">
-                <p class="section-label">Current target</p>
+                <div class="target-head">
+                  <p class="section-label">Current target</p>
+                  <button id="random-button" class="ghost-button target-swap-button" type="button">New target</button>
+                </div>
                 <h2 id="target-title">был</h2>
                 <p id="target-note" class="target-note">was, masculine</p>
               </section>
@@ -102,15 +105,13 @@
               </fieldset>
 
               <fieldset class="control-group">
-                <legend>After finish</legend>
+                <legend>Next rep</legend>
                 <div class="segmented" role="radiogroup" aria-label="After finish mode">
-                  <button class="segment" type="button" data-flow-mode="same" aria-pressed="true">Same</button>
+                  <button class="segment" type="button" data-flow-mode="same" aria-pressed="true" aria-label="Repeat this target after each finish">Repeat</button>
                   <button class="segment" type="button" data-flow-mode="random" aria-pressed="false">Random</button>
                 </div>
               </fieldset>
             </div>
-
-            <button id="random-button" class="ghost-button" type="button">Random</button>
           </div>
 
           <div id="last-result" class="last-result" aria-live="polite">
