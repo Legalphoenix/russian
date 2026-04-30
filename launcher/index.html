@@ -166,34 +166,6 @@
         white-space: nowrap;
       }
 
-      .continue-banner {
-        margin-top: 18px;
-        padding: 16px 20px;
-        border-radius: var(--radius-lg);
-        background: var(--panel);
-        border: 1px solid var(--line);
-        box-shadow: var(--shadow);
-      }
-
-      .continue-banner p {
-        margin: 0;
-        color: var(--muted);
-        font-size: 0.92rem;
-      }
-
-      .continue-banner a {
-        display: inline-flex;
-        align-items: center;
-        margin-top: 8px;
-        padding: 8px 16px;
-        border-radius: 999px;
-        background: var(--teal);
-        color: #fff;
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 0.9rem;
-      }
-
       @media (max-width: 640px) {
         .shell {
           width: min(100% - 24px, 980px);
@@ -278,8 +250,6 @@
         </a>
       </section>
     </main>
-    <div id="continueBanner"></div>
-
     <script>
       // Register service worker for offline support
       if ("serviceWorker" in navigator) {
@@ -362,8 +332,6 @@
         },
       ];
 
-      let mostRecent = null;
-
       for (const trainer of trainers) {
         try {
           const raw = localStorage.getItem(trainer.key);
@@ -384,25 +352,9 @@
             card.appendChild(div);
           }
 
-          // Track most recently used
-          if (state.savedAt && (!mostRecent || state.savedAt > mostRecent.savedAt)) {
-            mostRecent = { savedAt: state.savedAt, href: trainer.href, name: trainer.name, progress };
-          }
         } catch {
           // Ignore parse errors
         }
-      }
-
-      // Show continue banner
-      if (mostRecent) {
-        const ago = Math.round((Date.now() - mostRecent.savedAt) / 60000);
-        const agoText = ago < 60 ? `${ago}m ago` : ago < 1440 ? `${Math.round(ago / 60)}h ago` : `${Math.round(ago / 1440)}d ago`;
-        document.getElementById("continueBanner").innerHTML = `
-          <section class="continue-banner">
-            <p>Last session: <strong>${mostRecent.name}</strong> (${agoText}) · ${mostRecent.progress.label}</p>
-            <a href="${mostRecent.href}">Continue studying</a>
-          </section>
-        `;
       }
     </script>
   </body>
